@@ -6,10 +6,10 @@ if(isset($_POST['simpan'])){
     $tanggal = date('Y-m-d');
 
     if($jumlah > 0){
-        // Simjib biasanya hanya setor
         $stmt = $pdo->prepare("INSERT INTO simpanan (anggota_id, tanggal, jenis_simpanan, jumlah, tipe_transaksi, keterangan) VALUES (?, ?, 'wajib', ?, 'setor', ?)");
         $stmt->execute([$anggota_id, $tanggal, $jumlah, $ket]);
-        echo "<script>alert('Simpanan Wajib Berhasil!'); window.location='index.php?page=simpanan_simjib';</script>";
+        // UPDATE REDIRECT
+        echo "<script>alert('Simpanan Wajib Berhasil!'); window.location='index.php?page=simpanan/simpanan_simjib';</script>";
     }
 }
 $anggota = $pdo->query("SELECT * FROM anggota ORDER BY nama_lengkap ASC")->fetchAll();

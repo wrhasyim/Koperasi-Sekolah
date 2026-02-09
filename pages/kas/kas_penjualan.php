@@ -6,23 +6,21 @@ if(isset($_POST['simpan_penjualan'])){
     $keterangan = $_POST['keterangan'];
 
     if($jumlah > 0){
-        // Kategori: penjualan_harian, Arus: masuk
         $sql = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) 
                 VALUES (?, 'penjualan_harian', 'masuk', ?, ?, ?)";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$tanggal, $jumlah, $keterangan, $_SESSION['user']['id']]);
         
-        echo "<script>alert('Data Penjualan Berhasil Disimpan!'); window.location='index.php?page=kas_penjualan';</script>";
+        // UPDATE REDIRECT
+        echo "<script>alert('Data Penjualan Berhasil Disimpan!'); window.location='index.php?page=kas/kas_penjualan';</script>";
     }
 }
 
-// AMBIL DATA HARI INI
 $hari_ini = date('Y-m-d');
 $stmt = $pdo->prepare("SELECT * FROM transaksi_kas WHERE kategori='penjualan_harian' AND tanggal = ? ORDER BY id DESC");
 $stmt->execute([$hari_ini]);
 $penjualan_hari_ini = $stmt->fetchAll();
 
-// HITUNG TOTAL HARI INI
 $total_hari_ini = 0;
 foreach($penjualan_hari_ini as $p) $total_hari_ini += $p['jumlah'];
 ?>
@@ -82,7 +80,7 @@ foreach($penjualan_hari_ini as $p) $total_hari_ini += $p['jumlah'];
                                 <td><?= htmlspecialchars($row['keterangan']) ?></td>
                                 <td class="text-end fw-bold"><?= formatRp($row['jumlah']) ?></td>
                                 <td>
-                                    <a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=kas_penjualan" class="btn btn-sm btn-danger" onclick="return confirm('Hapus data ini?')"><i class="fas fa-trash"></i></a>
+                                    <a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=kas/kas_penjualan" class="btn btn-sm btn-danger" onclick="return confirm('Hapus data ini?')"><i class="fas fa-trash"></i></a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

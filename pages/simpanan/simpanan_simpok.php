@@ -8,7 +8,8 @@ if(isset($_POST['simpan'])){
     if($jumlah > 0){
         $stmt = $pdo->prepare("INSERT INTO simpanan (anggota_id, tanggal, jenis_simpanan, jumlah, tipe_transaksi, keterangan) VALUES (?, ?, 'pokok', ?, 'setor', ?)");
         $stmt->execute([$anggota_id, $tanggal, $jumlah, $ket]);
-        echo "<script>alert('Simpanan Pokok Berhasil!'); window.location='index.php?page=simpanan_simpok';</script>";
+        // UPDATE REDIRECT
+        echo "<script>alert('Simpanan Pokok Berhasil!'); window.location='index.php?page=simpanan/simpanan_simpok';</script>";
     }
 }
 $anggota = $pdo->query("SELECT * FROM anggota ORDER BY nama_lengkap ASC")->fetchAll();

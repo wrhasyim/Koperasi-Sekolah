@@ -2,22 +2,21 @@
 // LOGIKA SIMPAN PENGELUARAN
 if(isset($_POST['simpan_pengeluaran'])){
     $tanggal = $_POST['tanggal'];
-    $kategori = $_POST['kategori']; // belanja_stok, gaji_staff, dll
+    $kategori = $_POST['kategori']; 
     $jumlah = $_POST['jumlah'];
     $keterangan = $_POST['keterangan'];
 
     if($jumlah > 0){
-        // Arus: keluar
         $sql = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) 
                 VALUES (?, ?, 'keluar', ?, ?, ?)";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$tanggal, $kategori, $jumlah, $keterangan, $_SESSION['user']['id']]);
         
-        echo "<script>alert('Pengeluaran Berhasil Disimpan!'); window.location='index.php?page=kas_belanja';</script>";
+        // UPDATE REDIRECT
+        echo "<script>alert('Pengeluaran Berhasil Disimpan!'); window.location='index.php?page=kas/kas_belanja';</script>";
     }
 }
 
-// AMBIL 10 PENGELUARAN TERAKHIR
 $stmt = $pdo->query("SELECT * FROM transaksi_kas WHERE arus='keluar' ORDER BY tanggal DESC, id DESC LIMIT 10");
 $riwayat = $stmt->fetchAll();
 ?>
@@ -99,7 +98,7 @@ $riwayat = $stmt->fetchAll();
                                 <td><?= htmlspecialchars($row['keterangan']) ?></td>
                                 <td class="text-end text-danger fw-bold"><?= formatRp($row['jumlah']) ?></td>
                                 <td>
-                                    <a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=kas_belanja" class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus transaksi ini?')"><i class="fas fa-times"></i></a>
+                                    <a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=kas/kas_belanja" class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus transaksi ini?')"><i class="fas fa-times"></i></a>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# PENTING: Sesuaikan dengan nama folder di htdocs kamu
+# Sesuai screenshot kamu, nama foldernya 'ktm'
+RewriteBase /ktm/
+
+# Jangan ubah request jika file fisik atau folder memang ada
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Arahkan semua request lain ke index.php
+RewriteRule ^(.+)$ index.php?page=$1 [L,QSA]
