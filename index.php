@@ -14,56 +14,60 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Koperasi</title>
+    <title>Sistem Koperasi Digital</title>
     <base href="/ktm/"> 
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f7f9fc; color: #4a5568; overflow-x: hidden; }
+        :root {
+            --primary: #4e73df; --primary-dark: #224abe;
+            --success: #1cc88a; --info: #36b9cc; --warning: #f6c23e; --danger: #e74a3b;
+            --dark: #2c3e50; --light: #f8f9fc;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #5a5c69; overflow-x: hidden; }
         
-        /* Sidebar Modern */
-        .sidebar { min-height: 100vh; background: linear-gradient(180deg, #1a202c 0%, #2d3748 100%); color: white; transition: all 0.3s; box-shadow: 4px 0 24px rgba(0,0,0,0.05); }
-        .sidebar a { color: #cbd5e0; text-decoration: none; display: block; padding: 14px 24px; font-size: 0.9rem; border-left: 3px solid transparent; transition: 0.2s; }
-        .sidebar a:hover { background: rgba(255,255,255,0.05); color: #fff; }
-        .sidebar a.active { background: linear-gradient(90deg, rgba(66, 153, 225, 0.15) 0%, transparent 100%); color: #63b3ed; border-left-color: #63b3ed; font-weight: 600; }
-        .nav-header { padding: 24px 24px 10px; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; color: #718096; letter-spacing: 1.2px; }
+        /* SIDEBAR MODERN */
+        .sidebar { min-height: 100vh; background: #ffffff; width: 260px; position: fixed; top: 0; left: 0; z-index: 100; border-right: 1px solid #e3e6f0; transition: 0.3s; }
+        .sidebar .brand { height: 70px; display: flex; align-items: center; padding: 0 25px; font-weight: 800; font-size: 1.2rem; color: var(--primary); letter-spacing: 1px; border-bottom: 1px solid #f0f0f0; }
+        .sidebar-menu { padding: 20px 0; height: calc(100vh - 70px); overflow-y: auto; }
+        .nav-header { padding: 15px 25px 10px; font-size: 0.7rem; font-weight: 700; color: #b7b9cc; text-transform: uppercase; letter-spacing: 1px; }
+        .nav-link { display: flex; align-items: center; padding: 12px 25px; color: #5a5c69; font-weight: 500; font-size: 0.9rem; transition: 0.2s; position: relative; }
+        .nav-link i { width: 24px; font-size: 1rem; margin-right: 10px; color: #d1d3e2; transition: 0.2s; }
+        .nav-link:hover { color: var(--primary); background: #f8f9fc; text-decoration: none; }
+        .nav-link:hover i { color: var(--primary); }
+        .nav-link.active { color: var(--primary); background: #f0f4ff; font-weight: 700; }
+        .nav-link.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); border-radius: 0 4px 4px 0; }
+        .nav-link.active i { color: var(--primary); }
 
-        /* Card Modern */
-        .card { border: none; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02); transition: transform 0.2s, box-shadow 0.2s; background: #fff; }
-        .card:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02); }
-        .card-header { background: transparent; border-bottom: 1px solid #edf2f7; padding: 1.25rem 1.5rem; font-weight: 600; }
+        /* CONTENT AREA */
+        .main-content { margin-left: 260px; padding: 30px; transition: 0.3s; }
         
-        /* Gradients & Colors */
-        .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%) !important; }
-        .bg-gradient-success { background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%) !important; }
-        .bg-gradient-warning { background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%) !important; }
-        .bg-gradient-danger { background: linear-gradient(135deg, #e74a3b 0%, #be2617 100%) !important; }
-        .bg-gradient-info { background: linear-gradient(135deg, #36b9cc 0%, #258391 100%) !important; }
+        /* CARD PREMIUM */
+        .card { border: none; border-radius: 12px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); background: #fff; transition: 0.2s; }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.1); }
+        .card-header { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 1.2rem 1.5rem; font-weight: 700; color: var(--primary); }
+        
+        /* GRADIENTS */
+        .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
+        .bg-gradient-success { background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%); }
+        .bg-gradient-info    { background: linear-gradient(135deg, #36b9cc 0%, #258391 100%); }
+        .bg-gradient-warning { background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%); }
+        .bg-gradient-danger  { background: linear-gradient(135deg, #e74a3b 0%, #be2617 100%); }
 
-        /* Elements */
-        .btn { border-radius: 10px; padding: 8px 16px; font-weight: 500; letter-spacing: 0.3px; transition: 0.2s; }
-        .btn-primary { background-color: #4e73df; border-color: #4e73df; box-shadow: 0 4px 12px rgba(78, 115, 223, 0.25); }
-        .btn-primary:hover { background-color: #2e59d9; transform: translateY(-1px); }
+        /* UTILITIES */
+        .avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; text-transform: uppercase; font-size: 14px; }
+        .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+        .table thead th { background: #f8f9fc; color: #858796; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; border-bottom: 0; padding: 1rem; }
+        .table td { padding: 1rem; vertical-align: middle; color: #5a5c69; border-bottom: 1px solid #e3e6f0; }
         
-        .avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 14px; text-transform: uppercase; }
-        
-        .table thead th { background-color: #f8f9fa; color: #8898aa; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; border-bottom: none; padding: 1rem; }
-        .table td { padding: 1rem; vertical-align: middle; border-bottom: 1px solid #edf2f7; color: #5a5c69; }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
-        
-        .content { padding: 30px; width: 100%; }
-
         @media (max-width: 768px) {
-            .sidebar { position: fixed; top: 0; left: -260px; height: 100vh; width: 260px; z-index: 1050; }
+            .sidebar { left: -260px; }
             .sidebar.active { left: 0; }
-            .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1040; }
+            .main-content { margin-left: 0; }
+            .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99; }
             .overlay.active { display: block; }
         }
     </style>
@@ -72,77 +76,101 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 
 <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
 
-<div class="d-flex">
-    <div class="sidebar" id="sidebar">
-        <div class="p-4 text-center border-bottom border-secondary border-opacity-25">
-            <h5 class="mb-0 fw-bold text-white tracking-wide">KOPERASI</h5>
-            <small class="text-white-50">Sistem Terintegrasi</small>
-        </div>
-        
-        <div class="py-3">
-            <a href="dashboard" class="<?= $page=='dashboard'?'active':'' ?>"><i class="fas fa-th-large me-3" style="width:20px"></i> Dashboard</a>
+<div class="sidebar" id="sidebar">
+    <div class="brand">
+        <i class="fas fa-shapes me-2"></i> KOPERASI
+    </div>
+    <div class="sidebar-menu">
+        <a href="dashboard" class="nav-link <?= $page=='dashboard'?'active':'' ?>">
+            <i class="fas fa-fw fa-tachometer-alt"></i> <span>Dashboard</span>
+        </a>
 
-            <?php if($role == 'admin' || $role == 'staff' || $role == 'pengurus'): ?>
-            <div class="nav-header">Master Data</div>
-            <a href="data_anggota" class="<?= $page=='data_anggota'?'active':'' ?>"><i class="fas fa-users me-3" style="width:20px"></i> Data Anggota</a>
+        <?php if($role == 'admin' || $role == 'staff' || $role == 'pengurus'): ?>
+        <div class="nav-header">Master Data</div>
+        <a href="data_anggota" class="nav-link <?= $page=='data_anggota'?'active':'' ?>">
+            <i class="fas fa-fw fa-users"></i> <span>Data Anggota</span>
+        </a>
+        <?php endif; ?>
+
+        <?php if($role != 'guru'): ?> 
+        <div class="nav-header">Transaksi & Keuangan</div>
+            <?php if($role == 'admin' || $role == 'staff'): ?>
+            <a href="simpanan/transaksi_simpanan" class="nav-link <?= $page=='simpanan/transaksi_simpanan'?'active':'' ?>">
+                <i class="fas fa-fw fa-wallet"></i> <span>Transaksi Simpanan</span>
+            </a>
+            <a href="kas/kas_penjualan" class="nav-link <?= $page=='kas/kas_penjualan'?'active':'' ?>">
+                <i class="fas fa-fw fa-cash-register"></i> <span>Kasir Penjualan</span>
+            </a>
+            <a href="kas/kas_qris" class="nav-link <?= $page=='kas/kas_qris'?'active':'' ?>">
+                <i class="fas fa-fw fa-qrcode"></i> <span>Transaksi QRIS</span>
+            </a>
+            <a href="kas/kas_belanja" class="nav-link <?= $page=='kas/kas_belanja'?'active':'' ?>">
+                <i class="fas fa-fw fa-shopping-cart"></i> <span>Belanja Stok</span>
+            </a>
             <?php endif; ?>
-
-            <?php if($role != 'guru'): ?> 
-            <div class="nav-header">Simpanan</div>
-    <?php if($role == 'admin' || $role == 'staff'): ?>
-    <a href="simpanan/transaksi_simpanan" class="<?= $page=='simpanan/transaksi_simpanan'?'active':'' ?>">
-        <i class="fas fa-wallet me-3" style="width:20px"></i> Transaksi Simpanan
-    </a>
-    <?php endif; ?>
-    
-    <a href="simpanan/laporan_simpanan" class="<?= $page=='simpanan/laporan_simpanan'?'active':'' ?>">
-        <i class="fas fa-file-invoice me-3" style="width:20px"></i> Laporan Simpanan
-    </a>
-<?php endif; ?>
-
-            <?php if($role != 'guru'): ?>
-            <div class="nav-header">Inventory</div>
-                <a href="titipan/titipan" class="<?= $page=='titipan/titipan'?'active':'' ?>"><i class="fas fa-box-open me-3" style="width:20px"></i> Titipan Guru</a>
-                <a href="inventory/stok_sekolah" class="<?= $page=='inventory/stok_sekolah'?'active':'' ?>"><i class="fas fa-tshirt me-3" style="width:20px"></i> Stok Sekolah</a>
-                <a href="inventory/stok_eskul" class="<?= $page=='inventory/stok_eskul'?'active':'' ?>"><i class="fas fa-user-astronaut me-3" style="width:20px"></i> Stok Eskul</a>
-            <?php endif; ?>
-
-            <div class="nav-header">System</div>
-            <a href="profil" class="<?= $page=='profil'?'active':'' ?>"><i class="fas fa-user-circle me-3" style="width:20px"></i> Profil Saya</a>
             
-            <?php if($role == 'admin'): ?>
-                <a href="utilitas/backup" class="<?= $page=='utilitas/backup'?'active':'' ?>"><i class="fas fa-database me-3" style="width:20px"></i> Backup Data</a>
-            <?php endif; ?>
-            <?php if($role == 'admin' || $role == 'pengurus'): ?>
-                <a href="utilitas/tutup_buku" class="<?= $page=='utilitas/tutup_buku'?'active':'' ?>"><i class="fas fa-book-dead me-3" style="width:20px"></i> Tutup Buku</a>
-            <?php endif; ?>
+            <a href="kas/laporan_kas?mode=penjualan" class="nav-link <?= isset($_GET['mode']) && $_GET['mode']=='penjualan' ?'active':'' ?>">
+                <i class="fas fa-fw fa-chart-line"></i> <span>Laporan Penjualan</span>
+            </a>
 
-            <div class="mt-4 pb-5 px-3">
-                <a href="process/auth_logout.php" class="btn btn-danger w-100 shadow-sm"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
-            </div>
+            <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' && !isset($_GET['mode']) ?'active':'' ?>">
+                <i class="fas fa-fw fa-book"></i> <span>Laporan Arus Kas</span>
+            </a>
+
+            <a href="simpanan/laporan_simpanan" class="nav-link <?= $page=='simpanan/laporan_simpanan'?'active':'' ?>">
+                <i class="fas fa-fw fa-file-invoice"></i> <span>Laporan Simpanan</span>
+            </a>
+        <?php endif; ?>
+
+        <?php if($role != 'guru'): ?>
+        <div class="nav-header">Inventory</div>
+            <a href="titipan/titipan" class="nav-link <?= $page=='titipan/titipan'?'active':'' ?>">
+                <i class="fas fa-fw fa-box-open"></i> <span>Titipan Guru</span>
+            </a>
+            <a href="inventory/stok_sekolah" class="nav-link <?= $page=='inventory/stok_sekolah'?'active':'' ?>">
+                <i class="fas fa-fw fa-tshirt"></i> <span>Stok Sekolah</span>
+            </a>
+            <a href="inventory/stok_eskul" class="nav-link <?= $page=='inventory/stok_eskul'?'active':'' ?>">
+                <i class="fas fa-fw fa-user-astronaut"></i> <span>Stok Eskul</span>
+            </a>
+        <?php endif; ?>
+
+        <div class="nav-header">System</div>
+        <a href="profil" class="nav-link <?= $page=='profil'?'active':'' ?>">
+            <i class="fas fa-fw fa-user-circle"></i> <span>Profil Saya</span>
+        </a>
+        
+        <?php if($role == 'admin'): ?>
+            <a href="utilitas/backup" class="nav-link <?= $page=='utilitas/backup'?'active':'' ?>">
+                <i class="fas fa-fw fa-database"></i> <span>Backup Data</span>
+            </a>
+        <?php endif; ?>
+        
+        <div class="mt-4 pb-5 px-3">
+            <a href="process/auth_logout.php" class="btn btn-danger w-100 shadow-sm"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
         </div>
     </div>
+</div>
 
-    <div class="content">
-        <nav class="navbar navbar-light bg-white shadow-sm mb-4 rounded-3 d-md-none border">
-            <div class="container-fluid">
-                <button class="btn btn-light" type="button" onclick="toggleSidebar()">
-                    <i class="fas fa-bars text-primary"></i>
-                </button>
-                <span class="navbar-brand mb-0 h1 fs-6 fw-bold">Koperasi Digital</span>
-            </div>
-        </nav>
-
-        <div class="container-fluid p-0">
-            <?php
-                $filename = "pages/" . $page . ".php";
-                if(file_exists($filename)){
-                    include $filename;
-                } else {
-                    echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><h3 class='text-muted'>404 Not Found</h3></div></div>";
-                }
-            ?>
+<div class="main-content">
+    <nav class="navbar navbar-light bg-white shadow-sm mb-4 rounded-3 d-md-none border">
+        <div class="container-fluid">
+            <button class="btn btn-light" type="button" onclick="toggleSidebar()">
+                <i class="fas fa-bars text-primary"></i>
+            </button>
+            <span class="navbar-brand mb-0 h1 fs-6 fw-bold">Koperasi Digital</span>
         </div>
+    </nav>
+
+    <div class="container-fluid p-0">
+        <?php
+            $filename = "pages/" . $page . ".php";
+            if(file_exists($filename)){
+                include $filename;
+            } else {
+                echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-muted mb-3'><i class='fas fa-exclamation-circle'></i></div><h3 class='text-muted'>Halaman Tidak Ditemukan</h3><p class='text-muted'>File <b>pages/$page.php</b> belum dibuat.</p></div></div>";
+            }
+        ?>
     </div>
 </div>
 
