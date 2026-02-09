@@ -99,12 +99,14 @@ try {
                         </td>
                         <td class="text-end fw-bold text-success"><?= formatRp($aset) ?></td>
                         <td class="text-center pe-4">
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-success rounded-start" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>"><i class="fas fa-plus"></i></button>
+                            <div class="btn-group shadow-sm rounded-pill">
+                                <button class="btn btn-sm btn-success px-3" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>"><i class="fas fa-plus"></i></button>
+                                
                                 <?php if($row['stok'] > 0): ?>
-                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalOpname<?= $row['id'] ?>"><i class="fas fa-check"></i></button>
+                                <button class="btn btn-sm btn-outline-primary px-3" data-bs-toggle="modal" data-bs-target="#modalOpname<?= $row['id'] ?>"><i class="fas fa-check"></i></button>
                                 <?php endif; ?>
-                                <a href="inventory/stok_koperasi?hapus=<?= $row['id'] ?>" class="btn btn-sm btn-light text-danger rounded-end" onclick="return confirm('Hapus?')"><i class="fas fa-trash"></i></a>
+                                
+                                <a href="inventory/stok_koperasi?hapus=<?= $row['id'] ?>" class="btn btn-sm btn-light text-danger px-3" onclick="return confirm('Hapus?')"><i class="fas fa-trash"></i></a>
                             </div>
                             
                             <div class="modal fade" id="modalRestock<?= $row['id'] ?>" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content border-0 shadow-lg rounded-4"><form method="POST"><div class="modal-body p-4 text-start"><h6 class="fw-bold mb-3 text-center text-success">Restock</h6><input type="hidden" name="id_barang" value="<?= $row['id'] ?>"><p class="small text-center text-muted"><?= htmlspecialchars($row['nama_barang']) ?></p><input type="number" name="tambah_stok" class="form-control fw-bold text-center border-0 shadow-sm bg-success bg-opacity-10 text-success mb-3" placeholder="Jml Masuk" min="1" required><button type="submit" name="restock_barang" class="btn btn-success w-100 fw-bold btn-sm">Simpan</button></div></form></div></div></div>

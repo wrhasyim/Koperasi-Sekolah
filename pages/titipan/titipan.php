@@ -162,13 +162,17 @@ $anggota = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'pengurus')
                         <td class="text-end text-dark fw-bold"><?= formatRp($hak_guru) ?></td>
                         
                         <td class="text-center pe-4">
-                            <button class="btn btn-sm btn-success shadow-sm rounded-pill px-3 me-1" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Tambah Stok">
-                                <i class="fas fa-plus"></i>
-                            </button>
+                            <div class="btn-group shadow-sm rounded-pill">
+                                <button class="btn btn-sm btn-success px-3" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Tambah Stok">
+                                    <i class="fas fa-plus"></i>
+                                </button>
 
-                            <button class="btn btn-sm btn-outline-primary shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalUpdate<?= $row['id'] ?>" title="Stock Opname">
-                                <i class="fas fa-check"></i> Cek
-                            </button>
+                                <?php if($sisa > 0): ?>
+                                <button class="btn btn-sm btn-outline-primary px-3" data-bs-toggle="modal" data-bs-target="#modalUpdate<?= $row['id'] ?>" title="Stock Opname">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
                             
                             <div class="modal fade" id="modalRestock<?= $row['id'] ?>" tabindex="-1">
                                 <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -195,6 +199,7 @@ $anggota = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'pengurus')
                                 </div>
                             </div>
 
+                            <?php if($sisa > 0): ?>
                             <div class="modal fade" id="modalUpdate<?= $row['id'] ?>" tabindex="-1">
                                 <div class="modal-dialog modal-dialog-centered modal-sm">
                                     <div class="modal-content border-0 shadow-lg rounded-4">
@@ -224,6 +229,7 @@ $anggota = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'pengurus')
                                     </div>
                                 </div>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>

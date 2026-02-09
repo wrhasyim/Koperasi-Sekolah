@@ -120,18 +120,18 @@ try {
                         <td class="text-end fw-bold text-success"><?= formatRp($aset) ?></td>
                         
                         <td class="text-center pe-4">
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-success rounded-start" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Tambah Stok">
+                            <div class="btn-group shadow-sm rounded-pill">
+                                <button class="btn btn-sm btn-success px-3" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Tambah Stok">
                                     <i class="fas fa-plus"></i>
                                 </button>
 
                                 <?php if($row['stok'] > 0): ?>
-                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalOpname<?= $row['id'] ?>" title="Cek Fisik">
+                                <button class="btn btn-sm btn-outline-primary px-3" data-bs-toggle="modal" data-bs-target="#modalOpname<?= $row['id'] ?>" title="Cek Fisik">
                                     <i class="fas fa-check"></i>
                                 </button>
                                 <?php endif; ?>
                                 
-                                <a href="inventory/stok_sekolah?hapus=<?= $row['id'] ?>" class="btn btn-sm btn-light text-danger rounded-end" onclick="return confirm('Hapus data seragam ini?')" title="Hapus">
+                                <a href="inventory/stok_sekolah?hapus=<?= $row['id'] ?>" class="btn btn-sm btn-light text-danger px-3" onclick="return confirm('Hapus data seragam ini?')" title="Hapus">
                                     <i class="fas fa-trash"></i>
                                 </a>
                             </div>

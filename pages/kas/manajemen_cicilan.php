@@ -17,12 +17,13 @@ if(isset($_POST['bayar_cicilan'])){
         try {
             $pdo->beginTransaction();
 
-            // 1. Masuk Kas
+            // 1. Masuk Kas (Sebagai Penjualan Seragam/Eskul)
+            // Kategori default 'penjualan_seragam' (bisa disesuaikan jika perlu detail)
             $ket_transaksi = "Cicilan $nama_siswa: $nama_brg - " . $ket;
             $pdo->prepare("INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, 'penjualan_seragam', 'masuk', ?, ?, ?)")
                 ->execute([$tanggal, $bayar, $ket_transaksi, $user_id]);
 
-            // 2. Update Data Cicilan
+            // 2. Update Cicilan
             $sisa_baru = $sisa_lama - $bayar;
             $status = ($sisa_baru <= 0) ? 'lunas' : 'belum';
             
@@ -33,24 +34,22 @@ if(isset($_POST['bayar_cicilan'])){
             echo "<script>alert('Pembayaran Cicilan Berhasil!'); window.location='kas/manajemen_cicilan';</script>";
 
         } catch (Exception $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) $pdo->rollBack();
             echo "<script>alert('Error: " . $e->getMessage() . "');</script>";
         }
     }
 }
 
-// QUERY DATA CICILAN (BELUM LUNAS)
-$sql = "SELECT c.*, a.nama_lengkap, a.no_hp 
-        FROM cicilan c 
-        JOIN anggota a ON c.anggota_id = a.id 
-        WHERE c.status = 'belum' 
-        ORDER BY c.created_at DESC";
+// QUERY DATA (HANYA YANG BELUM LUNAS)
 $data = [];
 try {
+    $sql = "SELECT c.*, a.nama_lengkap 
+            FROM cicilan c 
+            JOIN anggota a ON c.anggota_id = a.id 
+            WHERE c.status = 'belum' 
+            ORDER BY c.created_at DESC";
     $data = $pdo->query($sql)->fetchAll();
-} catch(Exception $e) {
-    // Tabel belum dibuat (karena belum ada transaksi cicilan)
-}
+} catch(Exception $e) { }
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -73,25 +72,28 @@ try {
                     <th>Total Tagihan</th>
                     <th>Sudah Bayar</th>
                     <th class="text-danger fw-bold">Sisa Hutang</th>
-                    <th>Tanggal Beli</th>
+                    <th>Tgl Beli</th>
                     <th class="text-center pe-4">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if(empty($data)): ?>
-                    <tr><td colspan="7" class="text-center py-5 text-muted">Tidak ada data cicilan aktif.</td></tr>
+                    <tr><td colspan="7" class="text-center py-5 text-muted">Tidak ada siswa yang memiliki tunggakan cicilan.</td></tr>
                 <?php endif; 
                 foreach($data as $row): ?>
                 <tr>
-                    <td class="ps-4 fw-bold"><?= htmlspecialchars($row['nama_lengkap']) ?></td>
-                    <td><?= htmlspecialchars($row['nama_barang']) ?></td>
+                    <td class="ps-4 fw-bold text-primary"><?= htmlspecialchars($row['nama_lengkap']) ?></td>
+                    <td>
+                        <?= htmlspecialchars($row['nama_barang']) ?><br>
+                        <span class="badge bg-light text-secondary border"><?= strtoupper($row['kategori_barang'] ?? 'UMUM') ?></span>
+                    </td>
                     <td><?= formatRp($row['total_tagihan']) ?></td>
                     <td class="text-success"><?= formatRp($row['terbayar']) ?></td>
                     <td class="text-danger fw-bold"><?= formatRp($row['sisa']) ?></td>
                     <td class="text-muted small"><?= date('d/m/Y', strtotime($row['created_at'])) ?></td>
                     <td class="text-center pe-4">
                         <button class="btn btn-sm btn-primary shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalBayar<?= $row['id'] ?>">
-                            <i class="fas fa-money-bill-wave me-1"></i> Bayar
+                            <i class="fas fa-hand-holding-usd me-1"></i> Bayar
                         </button>
 
                         <div class="modal fade" id="modalBayar<?= $row['id'] ?>" tabindex="-1">
@@ -99,7 +101,7 @@ try {
                                 <div class="modal-content border-0 shadow-lg rounded-4">
                                     <form method="POST">
                                         <div class="modal-header bg-primary text-white border-0 rounded-top-4">
-                                            <h6 class="modal-title fw-bold">Input Pembayaran</h6>
+                                            <h6 class="modal-title fw-bold">Input Cicilan</h6>
                                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                         </div>
                                         <div class="modal-body p-4 text-start">
@@ -108,21 +110,22 @@ try {
                                             <input type="hidden" name="nama_barang_hidden" value="<?= $row['nama_barang'] ?>">
                                             <input type="hidden" name="nama_siswa_hidden" value="<?= $row['nama_lengkap'] ?>">
 
-                                            <div class="mb-3">
-                                                <small class="text-muted d-block">Sisa Tagihan:</small>
-                                                <h4 class="fw-bold text-danger"><?= formatRp($row['sisa']) ?></h4>
+                                            <div class="text-center mb-3">
+                                                <small class="text-muted text-uppercase d-block">Sisa Hutang</small>
+                                                <h3 class="fw-bold text-danger"><?= formatRp($row['sisa']) ?></h3>
+                                                <span class="badge bg-light text-dark mb-2"><?= htmlspecialchars($row['nama_lengkap']) ?></span>
                                             </div>
 
                                             <div class="mb-3">
                                                 <label class="small fw-bold text-muted">Jumlah Bayar</label>
-                                                <input type="number" name="jumlah_bayar" class="form-control form-control-lg fw-bold border-primary" required min="1000" max="<?= $row['sisa'] ?>">
+                                                <input type="number" name="jumlah_bayar" class="form-control form-control-lg fw-bold border-primary text-center" required min="1000" max="<?= $row['sisa'] ?>" placeholder="Rp...">
                                             </div>
                                             <div class="mb-3">
                                                 <label class="small fw-bold text-muted">Catatan</label>
                                                 <input type="text" name="keterangan" class="form-control bg-light" placeholder="Cicilan ke-...">
                                             </div>
                                             
-                                            <button type="submit" name="bayar_cicilan" class="btn btn-primary w-100 fw-bold py-2">Proses Bayar</button>
+                                            <button type="submit" name="bayar_cicilan" class="btn btn-primary w-100 fw-bold py-2 rounded-pill">Proses Pembayaran</button>
                                         </div>
                                     </form>
                                 </div>
