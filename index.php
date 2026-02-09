@@ -69,8 +69,9 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 
             <?php if($user['role'] == 'admin' || $user['role'] == 'staff'): ?>
             <div class="nav-header">Keuangan</div>
-            <a href="kas/kas_penjualan" class="<?= $page=='kas/kas_penjualan'?'active':'' ?>"><i class="fas fa-cash-register me-2"></i> Penjualan</a>
-            <a href="kas/kas_belanja" class="<?= $page=='kas/kas_belanja'?'active':'' ?>"><i class="fas fa-shopping-cart me-2"></i> Belanja</a>
+            <a href="kas/kas_penjualan" class="<?= $page=='kas/kas_penjualan'?'active':'' ?>"><i class="fas fa-cash-register me-2"></i> Penjualan Tunai</a>
+            <a href="kas/kas_qris" class="<?= $page=='kas/kas_qris'?'active':'' ?>"><i class="fas fa-qrcode me-2"></i> Penjualan QRIS</a>
+            <a href="kas/kas_belanja" class="<?= $page=='kas/kas_belanja'?'active':'' ?>"><i class="fas fa-shopping-cart me-2"></i> Belanja & Biaya</a>
             <a href="kas/laporan_kas" class="<?= $page=='kas/laporan_kas'?'active':'' ?>"><i class="fas fa-book me-2"></i> Laporan Kas</a>
             <?php endif; ?>
 
@@ -80,6 +81,12 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             <div class="nav-header">Inventory</div>
             <a href="inventory/stok_sekolah" class="<?= $page=='inventory/stok_sekolah'?'active':'' ?>"><i class="fas fa-tshirt me-2"></i> Seragam Sekolah</a>
             <a href="inventory/stok_eskul" class="<?= $page=='inventory/stok_eskul'?'active':'' ?>"><i class="fas fa-user-astronaut me-2"></i> Seragam Eskul</a>
+
+            <div class="nav-header">Pengaturan</div>
+            <a href="profil" class="<?= $page=='profil'?'active':'' ?>"><i class="fas fa-user-circle me-2"></i> Profil Saya</a>
+            <?php if($user['role'] == 'admin'): ?>
+                <a href="utilitas/backup" class="<?= $page=='utilitas/backup'?'active':'' ?>"><i class="fas fa-database me-2"></i> Backup Data</a>
+            <?php endif; ?>
 
             <div class="mt-4 pb-5">
                 <a href="process/auth_logout.php" class="text-danger bg-dark"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
@@ -99,7 +106,6 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 
         <div class="container-fluid p-0">
             <?php
-                // Router akan otomatis membaca inventory/stok_sekolah
                 $filename = "pages/" . $page . ".php";
                 if(file_exists($filename)){
                     include $filename;
