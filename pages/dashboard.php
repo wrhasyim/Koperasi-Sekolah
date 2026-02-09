@@ -1,10 +1,46 @@
 <?php
-// QUERY STATISTIK (Sama seperti sebelumnya)
-$q_kas = $pdo->query("SELECT SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE 0 END) as tm, SUM(CASE WHEN arus = 'keluar' THEN jumlah ELSE 0 END) as tk FROM transaksi_kas")->fetch();
+// --- 1. LOGIKA QUERY STATISTIK ---
+
+// A. Saldo Kas
+$q_kas = $pdo->query("SELECT SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE 0 END) as tm, 
+                             SUM(CASE WHEN arus = 'keluar' THEN jumlah ELSE 0 END) as tk 
+                      FROM transaksi_kas")->fetch();
 $saldo_kas = $q_kas['tm'] - $q_kas['tk'];
+
+// B. Total Sihara (Simpanan Hari Raya)
 $q_sihara = $pdo->query("SELECT SUM(jumlah) as total FROM simpanan WHERE jenis_simpanan='hari_raya' AND tipe_transaksi='setor'")->fetch();
+
+// C. Total Anggota Aktif
 $q_anggota = $pdo->query("SELECT COUNT(*) as total FROM anggota WHERE status_aktif=1")->fetch();
-$q_stok = $pdo->query("SELECT COUNT(*) as total FROM stok_barang WHERE stok < 5")->fetch();
+
+// D. LOGIKA STOCK ALERT (GABUNGAN TITIPAN & INVENTARIS)
+// Ambang batas stok menipis
+$limit_stok = 5;
+
+// 1. Cek Titipan (Sisa = Awal - Terjual)
+$sql_titipan = "SELECT id, nama_barang as nama, 'Titipan' as jenis, (stok_awal - stok_terjual) as sisa 
+                FROM titipan 
+                WHERE (stok_awal - stok_terjual) <= $limit_stok";
+$titipan_low = $pdo->query($sql_titipan)->fetchAll();
+
+// 2. Cek Stok Sekolah/Barang (Asumsi nama tabel 'stok_barang')
+// Pastikan tabel ini ada. Jika nama tabel beda (misal 'barang'), sesuaikan query ini.
+$barang_low = [];
+try {
+    $sql_barang = "SELECT id, nama_barang as nama, 'Inventaris' as jenis, stok as sisa 
+                   FROM stok_barang 
+                   WHERE stok <= $limit_stok";
+    $barang_low = $pdo->query($sql_barang)->fetchAll();
+} catch (Exception $e) {
+    // Jika tabel stok_barang belum dibuat/kosong, abaikan error agar dashboard tetap jalan
+    $barang_low = [];
+}
+
+// Gabungkan kedua array
+$stok_menipis_list = array_merge($titipan_low, $barang_low);
+$total_alert = count($stok_menipis_list);
+
+// E. Transaksi Terakhir
 $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id DESC LIMIT 5")->fetchAll();
 ?>
 
@@ -20,9 +56,9 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
     </div>
 </div>
 
-<div class="row g-4 mb-5">
+<div class="row g-4 mb-4">
     <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-success text-white h-100 overflow-hidden border-0">
+        <div class="card bg-gradient-success text-white h-100 overflow-hidden border-0 shadow-sm">
             <div class="card-body position-relative p-4">
                 <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
                     <i class="fas fa-money-bill-wave fa-6x"></i>
@@ -35,7 +71,7 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
     </div>
 
     <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-primary text-white h-100 overflow-hidden border-0">
+        <div class="card bg-gradient-primary text-white h-100 overflow-hidden border-0 shadow-sm">
             <div class="card-body position-relative p-4">
                 <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
                     <i class="fas fa-wallet fa-6x"></i>
@@ -48,7 +84,7 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
     </div>
 
     <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-info text-white h-100 overflow-hidden border-0">
+        <div class="card bg-gradient-info text-white h-100 overflow-hidden border-0 shadow-sm">
             <div class="card-body position-relative p-4">
                 <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
                     <i class="fas fa-users fa-6x"></i>
@@ -61,13 +97,13 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
     </div>
 
     <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-danger text-white h-100 overflow-hidden border-0">
+        <div class="card bg-gradient-danger text-white h-100 overflow-hidden border-0 shadow-sm">
             <div class="card-body position-relative p-4">
                 <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
                     <i class="fas fa-exclamation-triangle fa-6x"></i>
                 </div>
                 <h6 class="text-uppercase text-white-50 ls-1 mb-1">Stok Menipis</h6>
-                <h2 class="display-6 fw-bold mb-0"><?= $q_stok['total'] ?></h2>
+                <h2 class="display-6 fw-bold mb-0"><?= $total_alert ?></h2>
                 <small class="text-white-50 mt-2 d-block">Perlu Restock Segera</small>
             </div>
         </div>
@@ -75,26 +111,26 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
 </div>
 
 <div class="row g-4">
-    <div class="col-lg-8">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center bg-transparent border-0 pb-0">
+    <div class="col-lg-7">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
                 <h6 class="fw-bold text-dark m-0"><i class="fas fa-exchange-alt me-2 text-primary"></i> Transaksi Terakhir</h6>
                 <a href="kas/laporan_kas" class="btn btn-sm btn-light rounded-pill px-3">Lihat Semua</a>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                             <tr>
-                                <th>Info</th>
+                                <th class="ps-4">Info</th>
                                 <th>Keterangan</th>
-                                <th class="text-end">Jumlah</th>
+                                <th class="text-end pe-4">Jumlah</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach($recent_trx as $row): ?>
                             <tr>
-                                <td>
+                                <td class="ps-4">
                                     <span class="d-block fw-bold text-dark"><?= date('d M', strtotime($row['tanggal'])) ?></span>
                                     <small class="text-muted"><?= date('H:i', strtotime($row['created_at'])) ?></small>
                                 </td>
@@ -104,7 +140,7 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
                                         <?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?>
                                     </span>
                                 </td>
-                                <td class="text-end">
+                                <td class="text-end pe-4">
                                     <?php if($row['arus'] == 'masuk'): ?>
                                         <span class="text-success fw-bold">+ <?= number_format($row['jumlah']) ?></span>
                                     <?php else: ?>
@@ -120,43 +156,54 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
         </div>
     </div>
 
-    <div class="col-lg-4">
-        <div class="card h-100">
-            <div class="card-header bg-transparent border-0 pb-0">
-                <h6 class="fw-bold text-dark m-0"><i class="fas fa-rocket me-2 text-warning"></i> Akses Cepat</h6>
+    <div class="col-lg-5">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-header bg-white py-3 border-bottom-0">
+                <h6 class="fw-bold text-danger m-0"><i class="fas fa-bell me-2"></i> Perlu Restock (<?= $total_alert ?>)</h6>
             </div>
-            <div class="card-body">
-                <div class="d-grid gap-3">
-                    <a href="kas/kas_penjualan" class="btn btn-light p-3 text-start shadow-sm d-flex align-items-center border transition-hover">
-                        <div class="bg-success bg-opacity-10 p-2 rounded-circle me-3 text-success">
-                            <i class="fas fa-cash-register fa-lg"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold text-dark">Kasir Penjualan</div>
-                            <small class="text-muted">Input omzet harian</small>
-                        </div>
-                    </a>
-                    
-                    <a href="titipan/titipan" class="btn btn-light p-3 text-start shadow-sm d-flex align-items-center border transition-hover">
-                        <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-3 text-primary">
-                            <i class="fas fa-box-open fa-lg"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold text-dark">Konsinyasi Guru</div>
-                            <small class="text-muted">Cek stok titipan</small>
-                        </div>
-                    </a>
-
-                    <a href="inventory/stok_sekolah" class="btn btn-light p-3 text-start shadow-sm d-flex align-items-center border transition-hover">
-                        <div class="bg-warning bg-opacity-10 p-2 rounded-circle me-3 text-warning">
-                            <i class="fas fa-tshirt fa-lg"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold text-dark">Distribusi Seragam</div>
-                            <small class="text-muted">Catat pengambilan siswa</small>
-                        </div>
-                    </a>
+            <div class="card-body p-0">
+                <?php if($total_alert > 0): ?>
+                <div class="table-responsive" style="max-height: 350px;">
+                    <table class="table table-striped table-hover mb-0 small">
+                        <thead class="bg-danger text-white">
+                            <tr>
+                                <th class="ps-3">Nama Barang</th>
+                                <th>Jenis</th>
+                                <th class="text-center pe-3">Sisa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach($stok_menipis_list as $brg): ?>
+                            <tr>
+                                <td class="ps-3 fw-bold"><?= htmlspecialchars($brg['nama']) ?></td>
+                                <td>
+                                    <?php if($brg['jenis'] == 'Titipan'): ?>
+                                        <span class="badge bg-warning text-dark bg-opacity-25">Titipan</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-primary text-primary bg-opacity-10">Inventaris</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-center pe-3">
+                                    <?php if($brg['sisa'] <= 0): ?>
+                                        <span class="badge bg-danger">HABIS</span>
+                                    <?php else: ?>
+                                        <span class="fw-bold text-danger"><?= $brg['sisa'] ?></span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
+                <?php else: ?>
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-check-circle fa-3x mb-3 text-success opacity-50"></i>
+                        <p class="mb-0">Stok Aman. Belum ada yang menipis.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="card-footer bg-white text-center">
+                <a href="titipan/titipan" class="text-decoration-none small fw-bold">Cek Titipan &rarr;</a>
             </div>
         </div>
     </div>

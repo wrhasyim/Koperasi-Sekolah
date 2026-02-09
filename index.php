@@ -45,9 +45,18 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
         /* CONTENT AREA */
         .main-content { margin-left: 260px; padding: 30px; transition: 0.3s; }
         
-        /* CARD PREMIUM */
-        .card { border: none; border-radius: 12px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); background: #fff; transition: 0.2s; }
-        .card:hover { transform: translateY(-3px); box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.1); }
+        /* CARD PREMIUM (FIXED BUG: TRANSFORM DIHAPUS) */
+        .card { 
+            border: none; 
+            border-radius: 12px; 
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); 
+            background: #fff; 
+            transition: box-shadow 0.2s; /* Hanya transisi shadow */
+        }
+        .card:hover { 
+            /* transform: translateY(-3px);  <-- INI PENYEBAB POPUP ERROR, SUDAH DIHAPUS */
+            box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.15); 
+        }
         .card-header { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 1.2rem 1.5rem; font-weight: 700; color: var(--primary); }
         
         /* GRADIENTS */
@@ -127,6 +136,9 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             <a href="titipan/titipan" class="nav-link <?= $page=='titipan/titipan'?'active':'' ?>">
                 <i class="fas fa-fw fa-box-open"></i> <span>Titipan Guru</span>
             </a>
+            <a href="titipan/laporan_titipan" class="nav-link <?= $page=='titipan/laporan_titipan'?'active':'' ?>">
+                <i class="fas fa-fw fa-clipboard-list"></i> <span>Laporan Titipan</span>
+            </a>
             <a href="inventory/stok_sekolah" class="nav-link <?= $page=='inventory/stok_sekolah'?'active':'' ?>">
                 <i class="fas fa-fw fa-tshirt"></i> <span>Stok Sekolah</span>
             </a>
@@ -145,7 +157,13 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                 <i class="fas fa-fw fa-database"></i> <span>Backup Data</span>
             </a>
         <?php endif; ?>
-        
+
+        <?php if($role == 'admin' || $role == 'pengurus'): ?>
+            <a href="utilitas/riwayat_tutup_buku" class="nav-link <?= $page=='utilitas/riwayat_tutup_buku'?'active':'' ?>">
+                <i class="fas fa-fw fa-history"></i> <span>Riwayat Tutup Buku</span>
+            </a>
+        <?php endif; ?>
+
         <div class="mt-4 pb-5 px-3">
             <a href="process/auth_logout.php" class="btn btn-danger w-100 shadow-sm"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
         </div>

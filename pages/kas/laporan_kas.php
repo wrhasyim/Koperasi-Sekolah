@@ -8,7 +8,7 @@ $mode = isset($_GET['mode']) ? $_GET['mode'] : 'all'; // Mode: 'penjualan' atau 
 $filter_sql = "";
 $judul_halaman = "Laporan Arus Kas";
 if($mode == 'penjualan'){
-    $judul_halaman = "Laporan & Rekap Penjualan";
+    $judul_halaman = "Laporan Penjualan & Titipan"; // JUDUL DIPERJELAS
     // Hanya ambil Penjualan Harian & QRIS
     $filter_sql = "AND kategori IN ('penjualan_harian', 'qris_masuk')";
 }
@@ -22,7 +22,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([$tgl_awal, $tgl_akhir]);
 $transaksi = $stmt->fetchAll();
 
-// --- LOGIKA CEK TUTUP BUKU (AUTO DETECT) ---
+// --- LOGIKA CEK TUTUP BUKU ---
 $bulan_lalu = date('m', strtotime("-1 month"));
 $tahun_lalu = date('Y', strtotime("-1 month"));
 $nama_bulan_lalu = date('F Y', strtotime("-1 month")); 
@@ -139,9 +139,9 @@ if(isset($_GET['export_excel'])){
                         <td class="ps-4 text-muted fw-bold"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                         <td>
                             <?php if($row['kategori'] == 'penjualan_harian'): ?>
-                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">PENJUALAN</span>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">PENJUALAN / TITIPAN</span>
                             <?php elseif($row['kategori'] == 'qris_masuk'): ?>
-                                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">QRIS/TRANSFER</span>
+                                <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">QRIS / TRANSFER</span>
                             <?php else: ?>
                                 <span class="badge bg-light text-secondary border"><?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?></span>
                             <?php endif; ?>

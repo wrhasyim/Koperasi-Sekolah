@@ -1,8 +1,5 @@
 <?php
 // ... (Logika PHP Simpan/Update SAMA PERSIS dengan sebelumnya, tidak berubah) ...
-// Copy bagian PHP logic dari file sebelumnya, paste di sini paling atas.
-// Di bawah ini adalah bagian HTML Tampilannya yang baru.
-
 if(isset($_POST['simpan_penjualan'])){
     $tanggal = $_POST['tanggal'];
     $jumlah = $_POST['jumlah'];
@@ -15,7 +12,6 @@ if(isset($_POST['simpan_penjualan'])){
         echo "<script>alert('Berhasil!'); window.location='kas/kas_penjualan';</script>";
     }
 }
-// Update logic juga sama...
 if(isset($_POST['update_penjualan'])){
     $id = $_POST['id_transaksi']; $tanggal = $_POST['tanggal']; $jumlah = $_POST['jumlah']; $keterangan = $_POST['keterangan'];
     $cek = $pdo->prepare("SELECT tanggal FROM transaksi_kas WHERE id = ?"); $cek->execute([$id]); $tgl_lama = $cek->fetch()['tanggal'];
@@ -50,7 +46,7 @@ $total_hari_ini = 0; foreach($penjualan_hari_ini as $p) $total_hari_ini += $p['j
                         <i class="fas fa-cash-register fa-3x"></i>
                     </div>
                     <h4 class="fw-bold">Input Omzet</h4>
-                    <p class="text-white-50 small">Masukkan total penjualan kotor hari ini.</p>
+                    <p class="text-white-50 small">Masukkan total uang di laci (Tunai).</p>
                 </div>
 
                 <form method="POST">
@@ -59,12 +55,15 @@ $total_hari_ini = 0; foreach($penjualan_hari_ini as $p) $total_hari_ini += $p['j
                         <input type="date" name="tanggal" class="form-control form-control-lg border-0 bg-white bg-opacity-10 text-white" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="small text-white-50 fw-bold text-uppercase">Nominal (Rp)</label>
+                        <label class="small text-white-50 fw-bold text-uppercase">Nominal Total (Rp)</label>
                         <input type="number" name="jumlah" class="form-control form-control-lg border-0 bg-white text-success fw-bold" placeholder="0" required>
+                        <div class="form-text text-white-50 small mt-2">
+                            <i class="fas fa-info-circle me-1"></i> Termasuk hasil penjualan <b>Barang Titipan (Konsinyasi)</b>.
+                        </div>
                     </div>
                     <div class="mb-4">
                         <label class="small text-white-50 fw-bold text-uppercase">Catatan</label>
-                        <textarea name="keterangan" class="form-control border-0 bg-white bg-opacity-10 text-white" rows="2" placeholder="Contoh: Snack & ATK"></textarea>
+                        <textarea name="keterangan" class="form-control border-0 bg-white bg-opacity-10 text-white" rows="2" placeholder="Contoh: Snack, ATK & Titipan Guru"></textarea>
                     </div>
                     <button type="submit" name="simpan_penjualan" class="btn btn-light w-100 py-3 text-success fw-bold shadow-sm">
                         <i class="fas fa-plus-circle me-2"></i> Simpan Data
@@ -108,7 +107,7 @@ $total_hari_ini = 0; foreach($penjualan_hari_ini as $p) $total_hari_ini += $p['j
                                 </td>
                             </tr>
                             
-                            <div class="modal fade" id="modalEdit<?= $row['id'] ?>" tabindex="-1">
+                             <div class="modal fade" id="modalEdit<?= $row['id'] ?>" tabindex="-1">
                                 <div class="modal-dialog modal-sm">
                                     <div class="modal-content border-0 shadow-lg rounded-4">
                                         <form method="POST">
