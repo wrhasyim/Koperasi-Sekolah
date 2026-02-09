@@ -45,16 +45,15 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
         /* CONTENT AREA */
         .main-content { margin-left: 260px; padding: 30px; transition: 0.3s; }
         
-        /* CARD PREMIUM (FIXED BUG: TRANSFORM DIHAPUS) */
+        /* CARD PREMIUM */
         .card { 
             border: none; 
             border-radius: 12px; 
             box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); 
             background: #fff; 
-            transition: box-shadow 0.2s; /* Hanya transisi shadow */
+            transition: box-shadow 0.2s; 
         }
         .card:hover { 
-            /* transform: translateY(-3px);  <-- INI PENYEBAB POPUP ERROR, SUDAH DIHAPUS */
             box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.15); 
         }
         .card-header { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 1.2rem 1.5rem; font-weight: 700; color: var(--primary); }
@@ -107,8 +106,17 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             <a href="simpanan/transaksi_simpanan" class="nav-link <?= $page=='simpanan/transaksi_simpanan'?'active':'' ?>">
                 <i class="fas fa-fw fa-wallet"></i> <span>Transaksi Simpanan</span>
             </a>
+            
+            <a href="kas/penjualan_inventory" class="nav-link <?= $page=='kas/penjualan_inventory'?'active':'' ?>">
+                <i class="fas fa-fw fa-tags"></i> <span>Kasir Seragam & Barang</span>
+            </a>
+            
+            <a href="kas/manajemen_cicilan" class="nav-link <?= $page=='kas/manajemen_cicilan'?'active':'' ?>">
+                <i class="fas fa-fw fa-hand-holding-usd"></i> <span>Manajemen Cicilan</span>
+            </a>
+
             <a href="kas/kas_penjualan" class="nav-link <?= $page=='kas/kas_penjualan'?'active':'' ?>">
-                <i class="fas fa-fw fa-cash-register"></i> <span>Kasir Penjualan</span>
+                <i class="fas fa-fw fa-cash-register"></i> <span>Kasir Omzet Manual</span>
             </a>
             <a href="kas/kas_qris" class="nav-link <?= $page=='kas/kas_qris'?'active':'' ?>">
                 <i class="fas fa-fw fa-qrcode"></i> <span>Transaksi QRIS</span>
@@ -119,11 +127,15 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             <?php endif; ?>
             
             <a href="kas/laporan_kas?mode=penjualan" class="nav-link <?= isset($_GET['mode']) && $_GET['mode']=='penjualan' ?'active':'' ?>">
-                <i class="fas fa-fw fa-chart-line"></i> <span>Laporan Penjualan</span>
+                <i class="fas fa-fw fa-chart-line"></i> <span>Grafik Penjualan</span>
             </a>
 
             <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' && !isset($_GET['mode']) ?'active':'' ?>">
-                <i class="fas fa-fw fa-book"></i> <span>Laporan Arus Kas</span>
+                <i class="fas fa-fw fa-book"></i> <span>Laporan Kas Koperasi</span>
+            </a>
+
+            <a href="kas/laporan_distribusi" class="nav-link <?= $page=='kas/laporan_distribusi'?'active':'' ?>">
+                <i class="fas fa-fw fa-file-contract"></i> <span>Laporan Distribusi</span>
             </a>
 
             <a href="simpanan/laporan_simpanan" class="nav-link <?= $page=='simpanan/laporan_simpanan'?'active':'' ?>">
@@ -139,9 +151,15 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             <a href="titipan/laporan_titipan" class="nav-link <?= $page=='titipan/laporan_titipan'?'active':'' ?>">
                 <i class="fas fa-fw fa-clipboard-list"></i> <span>Laporan Titipan</span>
             </a>
-            <a href="inventory/stok_sekolah" class="nav-link <?= $page=='inventory/stok_sekolah'?'active':'' ?>">
-                <i class="fas fa-fw fa-tshirt"></i> <span>Stok Sekolah</span>
+            
+            <a href="inventory/stok_koperasi" class="nav-link <?= $page=='inventory/stok_koperasi'?'active':'' ?>">
+                <i class="fas fa-fw fa-store"></i> <span>Stok Koperasi</span>
             </a>
+
+            <a href="inventory/stok_sekolah" class="nav-link <?= $page=='inventory/stok_sekolah'?'active':'' ?>">
+                <i class="fas fa-fw fa-tshirt"></i> <span>Stok Seragam</span>
+            </a>
+            
             <a href="inventory/stok_eskul" class="nav-link <?= $page=='inventory/stok_eskul'?'active':'' ?>">
                 <i class="fas fa-fw fa-user-astronaut"></i> <span>Stok Eskul</span>
             </a>

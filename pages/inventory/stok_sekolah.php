@@ -1,281 +1,234 @@
 <?php
-$kategori_ini = 'seragam_sekolah';
+// --- PROSES PHP ---
 
-// --- PROSES 1: TAMBAH STOK BARU (BARANG DATANG DARI KONVEKSI) ---
-if(isset($_POST['tambah_stok_baru'])){
+// 1. TAMBAH SERAGAM BARU
+if(isset($_POST['tambah_barang'])){
     $nama = $_POST['nama_barang'];
-    $ukuran = $_POST['ukuran'];
     $stok = $_POST['stok'];
-    $nominal = $_POST['nominal']; // Nilai barang (bukan harga jual retail)
+    $modal = $_POST['harga_modal'];
+    $jual = $_POST['harga_jual'];
+    
+    // Auto Create Tabel jika belum ada
+    $pdo->exec("CREATE TABLE IF NOT EXISTS stok_sekolah (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nama_barang VARCHAR(100),
+        harga_modal DECIMAL(10,2),
+        harga_jual DECIMAL(10,2),
+        stok INT DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )");
 
-    $kode = "SRG-" . strtoupper($ukuran) . "-" . time(); 
-
-    // Kita simpan 'nominal' ke kolom harga_jual sebagai referensi nilai aset
-    $sql = "INSERT INTO stok_barang (kode_barang, kategori, nama_barang, ukuran, stok, harga_modal, harga_jual) 
-            VALUES (?, ?, ?, ?, ?, 0, ?)";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$kode, $kategori_ini, $nama, $ukuran, $stok, $nominal]);
-
-    echo "<script>alert('Stok Awal Berhasil Ditambahkan!'); window.location='inventory/stok_sekolah';</script>";
+    $sql = "INSERT INTO stok_sekolah (nama_barang, stok, harga_modal, harga_jual) VALUES (?, ?, ?, ?)";
+    $pdo->prepare($sql)->execute([$nama, $stok, $modal, $jual]);
+    
+    echo "<script>alert('Data Seragam Berhasil Ditambahkan!'); window.location='inventory/stok_sekolah';</script>";
 }
 
-// --- PROSES 2: CATAT PENGAMBILAN SERAGAM (SISWA) ---
-if(isset($_POST['catat_pengambilan'])){
-    $barang_id = $_POST['barang_id'];
-    $nama_siswa = $_POST['nama_siswa'];
-    $kelas = $_POST['kelas'];
-    $status = $_POST['status_bayar'];
-    $jumlah = $_POST['jumlah_ambil'];
-    $catatan = $_POST['catatan'];
-    $tanggal = date('Y-m-d');
-
-    // 1. Cek Stok Dulu
-    $cek = $pdo->prepare("SELECT stok FROM stok_barang WHERE id = ?");
-    $cek->execute([$barang_id]);
-    $data_stok = $cek->fetch();
-
-    if($data_stok['stok'] < $jumlah){
-        echo "<script>alert('Gagal! Stok barang tidak cukup.'); window.location='inventory/stok_sekolah';</script>";
+// 2. RESTOCK (TAMBAH STOK)
+if(isset($_POST['restock_barang'])){
+    $id = $_POST['id_barang'];
+    $tambah = $_POST['tambah_stok'];
+    
+    if($tambah < 1) {
+        echo "<script>alert('Jumlah restock minimal 1!'); window.location='inventory/stok_sekolah';</script>";
     } else {
-        // 2. Kurangi Stok
-        $kurang = $pdo->prepare("UPDATE stok_barang SET stok = stok - ? WHERE id = ?");
-        $kurang->execute([$jumlah, $barang_id]);
-
-        // 3. Catat di Riwayat Pengambilan (Bukan Kas)
-        $log = $pdo->prepare("INSERT INTO riwayat_pengambilan (barang_id, nama_siswa, kelas, jumlah_ambil, status_bayar, catatan, tanggal_ambil) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $log->execute([$barang_id, $nama_siswa, $kelas, $jumlah, $status, $catatan, $tanggal]);
-
-        echo "<script>alert('Pengambilan Berhasil Dicatat!'); window.location='inventory/stok_sekolah';</script>";
+        $pdo->prepare("UPDATE stok_sekolah SET stok = stok + ? WHERE id = ?")->execute([$tambah, $id]);
+        echo "<script>alert('Restock Seragam Berhasil!'); window.location='inventory/stok_sekolah';</script>";
     }
 }
 
-// --- PROSES 3: UPDATE DATA BARANG (EDIT) ---
-if(isset($_POST['update_barang'])){
+// 3. STOCK OPNAME (SESUAIKAN FISIK)
+if(isset($_POST['update_opname'])){
     $id = $_POST['id_barang'];
-    $stok_baru = $_POST['stok'];
-    $nominal_baru = $_POST['harga_jual'];
-
-    $sql = "UPDATE stok_barang SET stok=?, harga_jual=? WHERE id=?";
-    $pdo->prepare($sql)->execute([$stok_baru, $nominal_baru, $id]);
+    $fisik = $_POST['stok_fisik'];
     
-    echo "<script>alert('Data Stok Diupdate!'); window.location='inventory/stok_sekolah';</script>";
+    if($fisik < 0) {
+        echo "<script>alert('Stok tidak boleh negatif!'); window.location='inventory/stok_sekolah';</script>";
+    } else {
+        $pdo->prepare("UPDATE stok_sekolah SET stok = ? WHERE id = ?")->execute([$fisik, $id]);
+        echo "<script>alert('Stok Opname Berhasil!'); window.location='inventory/stok_sekolah';</script>";
+    }
 }
 
-// AMBIL DATA STOK
-$data = $pdo->query("SELECT * FROM stok_barang WHERE kategori='$kategori_ini' ORDER BY nama_barang ASC, ukuran ASC")->fetchAll();
+// 4. HAPUS BARANG
+if(isset($_GET['hapus'])){
+    $id = $_GET['hapus'];
+    $pdo->prepare("DELETE FROM stok_sekolah WHERE id = ?")->execute([$id]);
+    echo "<script>alert('Data seragam dihapus!'); window.location='inventory/stok_sekolah';</script>";
+}
 
-// AMBIL 10 RIWAYAT PENGAMBILAN TERAKHIR (JOIN TABEL)
-$riwayat = $pdo->query("SELECT r.*, b.nama_barang, b.ukuran 
-                        FROM riwayat_pengambilan r 
-                        JOIN stok_barang b ON r.barang_id = b.id 
-                        ORDER BY r.tanggal_ambil DESC, r.id DESC LIMIT 10")->fetchAll();
+// --- QUERY DATA ---
+$data = [];
+try {
+    $data = $pdo->query("SELECT * FROM stok_sekolah ORDER BY nama_barang ASC")->fetchAll();
+} catch (Exception $e) {
+    // Tabel belum ada
+}
 ?>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Distribusi Seragam Sekolah</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalTambah">
-        <i class="fas fa-plus"></i> Stok Masuk (Baru)
+<div class="d-flex justify-content-between flex-wrap align-items-center mb-4">
+    <div>
+        <h6 class="text-muted text-uppercase small ls-1 mb-1">Inventory</h6>
+        <h2 class="h3 fw-bold mb-0">Stok Seragam Sekolah</h2>
+    </div>
+    <button class="btn btn-primary shadow-sm rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#modalTambah">
+        <i class="fas fa-plus me-2"></i> Input Seragam
     </button>
 </div>
 
-<div class="row">
-    <div class="col-md-7">
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white fw-bold">
-                <i class="fas fa-boxes me-1"></i> Stok Gudang
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 text-sm">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Barang</th>
-                                <th class="text-center">Ukuran</th>
-                                <th class="text-center">Sisa Stok</th>
-                                <th class="text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($data as $row): 
-                                $stok_class = ($row['stok'] < 5) ? 'bg-danger' : 'bg-success';
-                            ?>
-                            <tr>
-                                <td class="fw-bold">
-                                    <?= htmlspecialchars($row['nama_barang']) ?>
-                                </td>
-                                <td class="text-center"><span class="badge bg-secondary"><?= $row['ukuran'] ?></span></td>
-                                <td class="text-center">
-                                    <span class="badge <?= $stok_class ?> rounded-pill px-3"><?= $row['stok'] ?></span>
-                                </td>
-                                <td class="text-center">
-                                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAmbil<?= $row['id'] ?>" title="Catat Pengambilan Siswa">
-                                        <i class="fas fa-hand-holding"></i> Ambil
-                                    </button>
-                                    
-                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalEdit<?= $row['id'] ?>" title="Edit Stok Manual">
-                                        <i class="fas fa-cog"></i>
-                                    </button>
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="bg-light text-secondary small">
+                    <tr>
+                        <th class="ps-4">Nama Item & Ukuran</th>
+                        <th class="text-end">Harga Modal</th>
+                        <th class="text-end">Harga Jual</th>
+                        <th class="text-center">Sisa Stok</th>
+                        <th class="text-end">Nilai Aset</th>
+                        <th class="text-center pe-4" style="min-width: 150px;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $total_aset = 0;
+                    if(empty($data)): ?><tr><td colspan="6" class="text-center py-5 text-muted">Belum ada data seragam.</td></tr><?php endif;
 
-                                    <div class="modal fade" id="modalAmbil<?= $row['id'] ?>" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <form method="POST">
-                                                    <div class="modal-header bg-success text-white">
-                                                        <h5 class="modal-title">Catat Pengambilan Seragam</h5>
-                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body text-start">
-                                                        <input type="hidden" name="barang_id" value="<?= $row['id'] ?>">
-                                                        
-                                                        <div class="alert alert-light border mb-3">
-                                                            <strong>Barang:</strong> <?= $row['nama_barang'] ?> (<?= $row['ukuran'] ?>)<br>
-                                                            <strong>Sisa Stok:</strong> <?= $row['stok'] ?> pcs
-                                                        </div>
-
-                                                        <div class="row">
-                                                            <div class="col-md-8 mb-3">
-                                                                <label class="form-label small fw-bold">Nama Siswa</label>
-                                                                <input type="text" name="nama_siswa" class="form-control" required placeholder="Nama Lengkap">
-                                                            </div>
-                                                            <div class="col-md-4 mb-3">
-                                                                <label class="form-label small fw-bold">Kelas</label>
-                                                                <input type="text" name="kelas" class="form-control" required placeholder="X-A">
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="row">
-                                                            <div class="col-md-6 mb-3">
-                                                                <label class="form-label small fw-bold">Jumlah Ambil</label>
-                                                                <input type="number" name="jumlah_ambil" class="form-control" value="1" min="1" max="<?= $row['stok'] ?>" required>
-                                                            </div>
-                                                            <div class="col-md-6 mb-3">
-                                                                <label class="form-label small fw-bold">Status Pembayaran</label>
-                                                                <select name="status_bayar" class="form-select">
-                                                                    <option value="Lunas">✅ Lunas (Ada Bukti)</option>
-                                                                    <option value="Belum Lunas">❌ Belum Lunas (Hutang)</option>
-                                                                </select>
-                                                            </div>
-                                                        </div>
-
-                                                        <div class="mb-3">
-                                                            <label class="form-label small fw-bold">Catatan Tambahan</label>
-                                                            <textarea name="catatan" class="form-control" rows="2" placeholder="Contoh: Bukti Lunas No. 123 atau Janji bayar tgl sekian..."></textarea>
-                                                        </div>
-
-                                                        <button type="submit" name="catat_pengambilan" class="btn btn-success w-100">Simpan & Kurangi Stok</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="modal fade" id="modalEdit<?= $row['id'] ?>" tabindex="-1">
-                                        <div class="modal-dialog modal-sm">
-                                            <div class="modal-content">
-                                                <form method="POST">
-                                                    <div class="modal-header">
-                                                        <h6 class="modal-title">Koreksi Stok</h6>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body text-start">
-                                                        <input type="hidden" name="id_barang" value="<?= $row['id'] ?>">
-                                                        <div class="mb-3">
-                                                            <label class="form-label small">Stok Fisik Saat Ini</label>
-                                                            <input type="number" name="stok" class="form-control" value="<?= $row['stok'] ?>" required>
-                                                        </div>
-                                                        <div class="mb-3">
-                                                            <label class="form-label small">Nilai Barang (Rp)</label>
-                                                            <input type="number" name="harga_jual" class="form-control" value="<?= $row['harga_jual'] ?>">
-                                                        </div>
-                                                        <button type="submit" name="update_barang" class="btn btn-primary w-100 btn-sm">Simpan Koreksi</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-5">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white fw-bold text-primary">
-                <i class="fas fa-history me-1"></i> Riwayat Pengambilan Terakhir
-            </div>
-            <ul class="list-group list-group-flush">
-                <?php foreach($riwayat as $r): ?>
-                <li class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <strong><?= htmlspecialchars($r['nama_siswa']) ?></strong> <span class="text-muted small">(<?= htmlspecialchars($r['kelas']) ?>)</span>
-                            <div class="small text-muted">
-                                Mengambil: <?= $r['nama_barang'] ?> (<?= $r['ukuran'] ?>) - <b><?= $r['jumlah_ambil'] ?> pcs</b>
-                            </div>
-                            <?php if(!empty($r['catatan'])): ?>
-                                <div class="small text-info fst-italic mt-1"><i class="fas fa-sticky-note"></i> "<?= htmlspecialchars($r['catatan']) ?>"</div>
+                    foreach($data as $row): 
+                        $aset = $row['stok'] * $row['harga_modal'];
+                        $total_aset += $aset;
+                    ?>
+                    <tr>
+                        <td class="ps-4 fw-bold text-dark">
+                            <i class="fas fa-tshirt text-muted me-2"></i>
+                            <?= htmlspecialchars($row['nama_barang']) ?>
+                        </td>
+                        <td class="text-end text-muted"><?= number_format($row['harga_modal']) ?></td>
+                        <td class="text-end text-dark"><?= number_format($row['harga_jual']) ?></td>
+                        
+                        <td class="text-center">
+                            <?php if($row['stok'] <= 0): ?>
+                                <span class="badge bg-danger px-3 shadow-sm">HABIS</span>
+                            <?php elseif($row['stok'] <= 10): ?>
+                                <span class="fw-bold text-danger"><?= $row['stok'] ?></span>
+                            <?php else: ?>
+                                <span class="fw-bold text-dark"><?= $row['stok'] ?></span>
                             <?php endif; ?>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge <?= $r['status_bayar']=='Lunas'?'bg-success':'bg-danger' ?> rounded-pill">
-                                <?= $r['status_bayar'] ?>
-                            </span>
-                            <div class="small text-muted mt-1"><?= date('d/m/y', strtotime($r['tanggal_ambil'])) ?></div>
-                        </div>
-                    </div>
-                </li>
-                <?php endforeach; ?>
-                <?php if(empty($riwayat)): ?>
-                    <li class="list-group-item text-center text-muted py-4">Belum ada data pengambilan.</li>
-                <?php endif; ?>
-            </ul>
+                        </td>
+
+                        <td class="text-end fw-bold text-success"><?= formatRp($aset) ?></td>
+                        
+                        <td class="text-center pe-4">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-success rounded-start" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Tambah Stok">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+
+                                <?php if($row['stok'] > 0): ?>
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalOpname<?= $row['id'] ?>" title="Cek Fisik">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <?php endif; ?>
+                                
+                                <a href="inventory/stok_sekolah?hapus=<?= $row['id'] ?>" class="btn btn-sm btn-light text-danger rounded-end" onclick="return confirm('Hapus data seragam ini?')" title="Hapus">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+
+                            <div class="modal fade" id="modalRestock<?= $row['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered modal-sm">
+                                    <div class="modal-content border-0 shadow-lg rounded-4">
+                                        <form method="POST">
+                                            <div class="modal-body p-4 text-start">
+                                                <h6 class="fw-bold mb-3 text-center text-success">Restock Seragam</h6>
+                                                <input type="hidden" name="id_barang" value="<?= $row['id'] ?>">
+                                                <p class="small text-center text-muted mb-2"><?= htmlspecialchars($row['nama_barang']) ?></p>
+
+                                                <div class="bg-success bg-opacity-10 p-3 rounded-3 mb-3 border border-success border-opacity-25">
+                                                    <label class="form-label small fw-bold text-success mb-1">Jumlah Masuk:</label>
+                                                    <input type="number" name="tambah_stok" class="form-control fw-bold text-center border-0 shadow-sm text-success" placeholder="0" min="1" required>
+                                                </div>
+                                                <button type="submit" name="restock_barang" class="btn btn-success w-100 fw-bold btn-sm">Simpan</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if($row['stok'] > 0): ?>
+                            <div class="modal fade" id="modalOpname<?= $row['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered modal-sm">
+                                    <div class="modal-content border-0 shadow-lg rounded-4">
+                                        <form method="POST">
+                                            <div class="modal-body p-4 text-start">
+                                                <h6 class="fw-bold mb-3 text-center text-primary">Cek Fisik</h6>
+                                                <input type="hidden" name="id_barang" value="<?= $row['id'] ?>">
+                                                
+                                                <div class="text-center mb-3">
+                                                    <span class="d-block small text-muted">Stok Sistem</span>
+                                                    <span class="fs-2 fw-bold text-dark"><?= $row['stok'] ?></span>
+                                                </div>
+
+                                                <div class="bg-light p-3 rounded-3 mb-3 border">
+                                                    <label class="form-label small fw-bold text-dark mb-1">Fisik Nyata:</label>
+                                                    <input type="number" name="stok_fisik" class="form-control fw-bold text-center border-0 shadow-sm" value="<?= $row['stok'] ?>" min="0" required>
+                                                </div>
+                                                <button type="submit" name="update_opname" class="btn btn-primary w-100 fw-bold btn-sm">Update</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot class="bg-light fw-bold border-top">
+                    <tr>
+                        <td colspan="4" class="text-end text-uppercase small ls-1 text-muted py-3">Total Aset Seragam</td>
+                        <td class="text-end text-success py-3"><?= formatRp($total_aset) ?></td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="modalTambah" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
             <form method="POST">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Input Stok Masuk (Konveksi)</h5>
+                <div class="modal-header bg-primary text-white border-0 rounded-top-4">
+                    <h5 class="modal-title fw-bold">Input Data Seragam</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Jenis Seragam</label>
-                        <input type="text" name="nama_barang" class="form-control" placeholder="Contoh: Kemeja Putih Pendek" required>
+                        <label class="small fw-bold text-muted">Nama Item & Ukuran</label>
+                        <input type="text" name="nama_barang" class="form-control bg-light border-0" placeholder="Contoh: Seragam Batik - Ukuran L" required>
+                        <div class="form-text small">Sertakan ukuran agar stok akurat.</div>
                     </div>
                     <div class="row">
-                        <div class="col-6 mb-3">
-                            <label class="form-label fw-bold">Ukuran</label>
-                            <select name="ukuran" class="form-select">
-                                <option value="S">S</option>
-                                <option value="M">M</option>
-                                <option value="L">L</option>
-                                <option value="XL">XL</option>
-                                <option value="XXL">XXL</option>
-                                <option value="ALL">All Size</option>
-                            </select>
+                        <div class="col-4 mb-3">
+                            <label class="small fw-bold text-muted">Stok Awal</label>
+                            <input type="number" name="stok" class="form-control bg-light border-0 fw-bold" required>
                         </div>
-                        <div class="col-6 mb-3">
-                            <label class="form-label fw-bold">Jumlah Masuk</label>
-                            <input type="number" name="stok" class="form-control" placeholder="0" required>
+                        <div class="col-4 mb-3">
+                            <label class="small fw-bold text-muted">Modal</label>
+                            <input type="number" name="harga_modal" class="form-control bg-light border-0" required>
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Nilai Barang (Rp)</label>
-                        <input type="number" name="nominal" class="form-control" placeholder="Hanya untuk data aset (Opsional)" required>
+                        <div class="col-4 mb-3">
+                            <label class="small fw-bold text-muted">Jual</label>
+                            <input type="number" name="harga_jual" class="form-control bg-light border-0" required>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" name="tambah_stok_baru" class="btn btn-primary">Simpan Stok</button>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button type="submit" name="tambah_barang" class="btn btn-primary w-100 fw-bold">Simpan Data</button>
                 </div>
             </form>
         </div>
