@@ -1,5 +1,5 @@
 <?php
-// DEFAULT TANGGAL: Awal Bulan s/d Hari Ini
+// DEFAULT TANGGAL
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
@@ -11,7 +11,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([$tgl_awal, $tgl_akhir]);
 $transaksi = $stmt->fetchAll();
 
-// PROSES DOWNLOAD EXCEL
+// DOWNLOAD EXCEL (Clean URL Logic)
 if(isset($_GET['export_excel'])){
     header("Content-Type: application/vnd.ms-excel");
     header("Content-Disposition: attachment; filename=Laporan_Kas_$tgl_awal-sd-$tgl_akhir.xls");
@@ -31,16 +31,14 @@ if(isset($_GET['export_excel'])){
              $keluar . "\t" . 
              $saldo . "\n";
     }
-    exit; // Stop agar HTML bawah tidak ikut terdownload
+    exit;
 }
 ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Laporan Arus Kas</h1>
     
-    <form class="d-flex gap-2 align-items-center" method="GET" action="index.php">
-        <input type="hidden" name="page" value="kas/laporan_kas">
-        
+    <form class="d-flex gap-2 align-items-center" method="GET" action="kas/laporan_kas">
         <div class="input-group input-group-sm">
             <span class="input-group-text">Dari</span>
             <input type="date" name="tgl_awal" class="form-control" value="<?= $tgl_awal ?>">
@@ -55,7 +53,7 @@ if(isset($_GET['export_excel'])){
             <i class="fas fa-filter"></i> Tampilkan
         </button>
         
-        <a href="index.php?page=kas/laporan_kas&tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&export_excel=true" class="btn btn-sm btn-success">
+        <a href="kas/laporan_kas?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&export_excel=true" class="btn btn-sm btn-success">
             <i class="fas fa-file-excel"></i> Excel
         </a>
         

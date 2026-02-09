@@ -7,7 +7,9 @@ try {
     $pdo->prepare("DELETE FROM anggota WHERE id = ?")->execute([$id]);
     $_SESSION['success'] = "Anggota berhasil dihapus!";
 } catch (Exception $e) {
-    $_SESSION['error'] = "Gagal menghapus data.";
+    $_SESSION['error'] = "Gagal menghapus data. Mungkin masih ada data simpanan terkait.";
 }
-header("Location: ../index.php?page=data_anggota");
+
+// Redirect Clean
+header("Location: ../data_anggota");
 ?>

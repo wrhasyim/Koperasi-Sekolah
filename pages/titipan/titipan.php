@@ -13,7 +13,8 @@ if(isset($_POST['tambah_titipan'])){
     $sql = "INSERT INTO titipan (anggota_id, nama_barang, tanggal_titip, stok_awal, harga_modal, harga_jual) 
             VALUES (?, ?, ?, ?, ?, ?)";
     $pdo->prepare($sql)->execute([$anggota_id, $nama_barang, $tgl, $stok, $modal, $jual]);
-    echo "<script>alert('Barang Berhasil Ditambahkan!'); window.location='index.php?page=titipan/titipan&guru_id=$anggota_id';</script>";
+    // Redirect Clean
+    echo "<script>alert('Barang Berhasil Ditambahkan!'); window.location='titipan/titipan?guru_id=$anggota_id';</script>";
 }
 
 // 2. UPDATE STOK
@@ -30,7 +31,8 @@ if(isset($_POST['update_stok'])){
         echo "<script>alert('Error: Terjual melebihi stok awal!');</script>";
     } else {
         $pdo->prepare("UPDATE titipan SET stok_terjual = ? WHERE id = ?")->execute([$terjual_baru, $id]);
-        echo "<script>window.location='index.php?page=titipan/titipan&guru_id=$guru_redirect';</script>";
+        // Redirect Clean
+        echo "<script>window.location='titipan/titipan?guru_id=$guru_redirect';</script>";
     }
 }
 
@@ -49,7 +51,7 @@ $query = "SELECT t.*, a.nama_lengkap
           ORDER BY a.nama_lengkap ASC, t.nama_barang ASC";
 $data = $pdo->query($query)->fetchAll();
 
-// QUERY LIST GURU (Untuk Dropdown)
+// QUERY LIST GURU
 $anggota = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'staff', 'pengurus') ORDER BY nama_lengkap ASC")->fetchAll();
 ?>
 
@@ -62,8 +64,7 @@ $anggota = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'staff', 'p
 
 <div class="card shadow-sm mb-3 border-0">
     <div class="card-body p-2 bg-light rounded">
-        <form method="GET" action="index.php" class="row g-2 align-items-center">
-            <input type="hidden" name="page" value="titipan/titipan">
+        <form method="GET" action="titipan/titipan" class="row g-2 align-items-center">
             <div class="col-auto">
                 <label class="fw-bold text-muted small">Pilih Guru:</label>
             </div>
