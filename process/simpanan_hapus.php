@@ -1,28 +1,26 @@
 <?php
 session_start();
 require_once '../config/database.php';
-require_once '../config/functions.php'; // Penting: Include functions
+require_once '../config/functions.php';
 
 if(isset($_GET['id']) && isset($_GET['redirect'])){
     $id = $_GET['id'];
     $page = $_GET['redirect']; 
 
     try {
-        // 1. Ambil Tanggal Transaksi Dulu
-        $cek = $pdo->prepare("SELECT tanggal FROM transaksi_kas WHERE id = ?");
+        $cek = $pdo->prepare("SELECT tanggal FROM simpanan WHERE id = ?");
         $cek->execute([$id]);
         $data = $cek->fetch();
 
-        // 2. CEK STATUS PERIODE (Fitur Baru)
         if(cekStatusPeriode($pdo, $data['tanggal'])){
-            echo "<script>alert('GAGAL! Transaksi tidak bisa dihapus karena Buku Bulan tersebut SUDAH DITUTUP.'); window.location='../" . $page . "';</script>";
+            echo "<script>alert('GAGAL! Periode TUTUP BUKU.'); window.location='../" . $page . "';</script>";
             exit;
         }
 
-        // 3. Jika Aman, Lanjut Hapus
-        $stmt = $pdo->prepare("DELETE FROM transaksi_kas WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM simpanan WHERE id = ?");
         $stmt->execute([$id]);
         
+        // Redirect aman (mendukung parameter ?tab=simpok)
         header("Location: ../" . $page);
     } catch (Exception $e) {
         echo "Gagal menghapus: " . $e->getMessage();
