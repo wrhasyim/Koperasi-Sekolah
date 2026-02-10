@@ -4,7 +4,10 @@ require_once 'config/database.php';
 // Fungsi helper untuk log visual
 function logger($msg, $type = 'success') {
     $color = ($type == 'success') ? '#1cc88a' : '#e74a3b';
-    echo "<div style='margin-bottom:8px; padding:12px; background:#fff; border-left:5px solid $color; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: monospace;'>$msg</div>";
+    $icon  = ($type == 'success') ? 'check-circle' : 'times-circle';
+    echo "<div style='margin-bottom:8px; padding:12px; background:#fff; border-left:5px solid $color; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: monospace; display:flex; align-items:center;'>
+            <i class='fas fa-$icon' style='color:$color; margin-right:10px;'></i> $msg
+          </div>";
 }
 ?>
 <!DOCTYPE html>
@@ -13,6 +16,7 @@ function logger($msg, $type = 'success') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FACTORY RESET KOPERASI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fc; color: #333; }
         h1 { color: #e74a3b; border-bottom: 2px solid #e74a3b; padding-bottom: 10px; }
@@ -20,6 +24,7 @@ function logger($msg, $type = 'success') {
         .btn-reset { background-color: #e74a3b; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; width: 100%; }
         .btn-reset:hover { background-color: #c0392b; }
         .btn-back { display: inline-block; margin-top: 20px; text-decoration: none; color: #4e73df; font-weight: bold; }
+        .log-area { margin-top: 20px; padding: 10px; background: #eaecf4; border-radius: 8px; max-height: 400px; overflow-y: auto; }
     </style>
 </head>
 <body>
@@ -30,94 +35,110 @@ function logger($msg, $type = 'success') {
         <h3>⚠ PERINGATAN KERAS!</h3>
         <p>Anda akan melakukan <strong>RESET TOTAL</strong> pada sistem. Tindakan ini tidak dapat dibatalkan.</p>
         <ul>
-            <li>Semua Riwayat Transaksi (Kas, QRIS, Belanja) akan <strong>DIHAPUS</strong>.</li>
+            <li>Semua Riwayat Transaksi (Kas, QRIS, Belanja, Honor) akan <strong>DIHAPUS</strong>.</li>
             <li>Semua Data Inventory (Stok Barang, Titipan) akan <strong>DIKOSONGKAN</strong>.</li>
-            <li>Semua Data Tabungan & Cicilan akan <strong>HILANG</strong>.</li>
+            <li>Semua Data Tabungan, Cicilan & Utang akan <strong>HILANG</strong>.</li>
             <li>Semua Akun Anggota (Siswa, Guru, Staff) akan <strong>DIHAPUS</strong>.</li>
-            <li><strong>HANYA AKUN 'ADMIN' YANG AKAN DISISAKAN.</strong></li>
+            <li>Pengaturan (Header Cetak & Persentase) akan kembali ke <strong>DEFAULT</strong>.</li>
+            <li><strong>HANYA AKUN 'ADMIN' (ID 1) YANG AKAN DISISAKAN.</strong></li>
         </ul>
         <p>Pastikan Anda sudah melakukan <strong>BACKUP</strong> jika data ini penting.</p>
     </div>
     
     <form method="POST" onsubmit="return confirm('APAKAH ANDA YAKIN 100%? SEMUA DATA AKAN HILANG PERMANEN!');">
         <button type="submit" name="reset_db" class="btn-reset">
-            YA, HAPUS SEMUA DATA & SISAKAN ADMIN
+            <i class="fas fa-trash-alt me-2"></i> YA, HAPUS SEMUA DATA & SISAKAN ADMIN
         </button>
     </form>
     
-    <br>
+    <div class="log-area">
+    <?php
+    if(isset($_POST['reset_db'])){
+        try {
+            $pdo->beginTransaction();
 
-<?php
-if(isset($_POST['reset_db'])){
-    echo "<h3>⏳ Memproses Reset...</h3>";
-    
-    try {
-        // Matikan pengecekan foreign key sementara agar truncate berjalan mulus
-        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+            // 1. MATIKAN FOREIGN KEY CHECKS
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+            logger("Pengecekan Foreign Key dinonaktifkan sementara.");
 
-        // --- 1. RESET KEUANGAN ---
-        $pdo->exec("TRUNCATE TABLE transaksi_kas");
-        logger("✅ Tabel 'transaksi_kas' berhasil dikosongkan.");
+            // 2. DAFTAR TABEL YANG AKAN DIKOSONGKAN (TRUNCATE)
+            $tables = [
+                'transaksi_kas',
+                'cicilan',
+                'simpanan',
+                'riwayat_pengambilan',
+                'titipan',
+                'stok_koperasi',
+                'stok_sekolah',
+                'stok_eskul',
+                'stok_barang', // Jika ada tabel ini
+                'tutup_buku',
+                'log_aktivitas'
+            ];
 
-        $pdo->exec("TRUNCATE TABLE simpanan");
-        logger("✅ Tabel 'simpanan' (Tabungan) berhasil dikosongkan.");
+            foreach($tables as $table){
+                // Cek apakah tabel ada sebelum truncate untuk menghindari error
+                $check = $pdo->query("SHOW TABLES LIKE '$table'");
+                if($check->rowCount() > 0){
+                    $pdo->exec("TRUNCATE TABLE $table");
+                    logger("Tabel <b>$table</b> berhasil dikosongkan.");
+                }
+            }
 
-        $pdo->exec("TRUNCATE TABLE tutup_buku");
-        logger("✅ Tabel 'tutup_buku' berhasil dikosongkan.");
+            // 3. RESET ANGGOTA (HAPUS SEMUA KECUALI ADMIN ID 1)
+            $stmt = $pdo->prepare("DELETE FROM anggota WHERE id != 1");
+            $stmt->execute();
+            logger("Semua anggota dihapus, menyisakan Admin Utama.");
 
-        // --- 2. RESET INVENTORY ---
-        $pdo->exec("TRUNCATE TABLE stok_koperasi");
-        logger("✅ Tabel 'stok_koperasi' berhasil dikosongkan.");
+            // Reset Auto Increment Anggota agar mulai dari 2 lagi
+            $pdo->exec("ALTER TABLE anggota AUTO_INCREMENT = 2");
+            logger("Auto Increment tabel Anggota di-reset.");
 
-        $pdo->exec("TRUNCATE TABLE stok_sekolah");
-        logger("✅ Tabel 'stok_sekolah' berhasil dikosongkan.");
+            // 4. RESET PENGATURAN (CREATE IF NOT EXISTS & INSERT DEFAULT)
+            // Pastikan tabel pengaturan ada
+            $sql_setting = "CREATE TABLE IF NOT EXISTS `pengaturan` (
+                `kunci` varchar(50) NOT NULL,
+                `nilai` text DEFAULT NULL,
+                `keterangan` varchar(100) DEFAULT NULL,
+                PRIMARY KEY (`kunci`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+            $pdo->exec($sql_setting);
+            
+            // Kosongkan pengaturan lama
+            $pdo->exec("TRUNCATE TABLE pengaturan");
 
-        $pdo->exec("TRUNCATE TABLE stok_eskul");
-        logger("✅ Tabel 'stok_eskul' berhasil dikosongkan.");
+            // Masukkan pengaturan default
+            $defaults = [
+                ['header_nama', 'KOPERASI SEKOLAH', 'Nama Instansi'],
+                ['header_alamat', 'Alamat Sekolah', 'Alamat Lengkap'],
+                ['header_kontak', 'Telp: -', 'Kontak'],
+                ['persen_staff', '20', 'Honor Staff (%)'],
+                ['persen_pengurus', '15', 'Honor Pengurus (%)'],
+                ['persen_pembina', '5', 'Honor Pembina (%)'],
+                ['persen_dansos', '10', 'Dana Sosial (%)'],
+                ['persen_kas', '50', 'Sisa Kas (%)']
+            ];
 
-        $pdo->exec("TRUNCATE TABLE titipan");
-        logger("✅ Tabel 'titipan' (Konsinyasi Guru) berhasil dikosongkan.");
+            $stmt_set = $pdo->prepare("INSERT INTO pengaturan (kunci, nilai, keterangan) VALUES (?, ?, ?)");
+            foreach($defaults as $def){
+                $stmt_set->execute($def);
+            }
+            logger("Pengaturan sistem dikembalikan ke default.");
 
-        // --- 3. RESET STRUKTUR CICILAN (DROP & CREATE) ---
-        // Kita drop untuk memastikan strukturnya benar-benar baru (support input manual)
-        $pdo->exec("DROP TABLE IF EXISTS cicilan");
-        $sql_cicilan = "CREATE TABLE cicilan (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            nama_siswa VARCHAR(100) NOT NULL,
-            kelas VARCHAR(50) NOT NULL,
-            kategori_barang VARCHAR(50) NOT NULL,
-            nama_barang VARCHAR(255) NOT NULL,
-            total_tagihan DECIMAL(15,2) NOT NULL,
-            terbayar DECIMAL(15,2) NOT NULL DEFAULT 0,
-            sisa DECIMAL(15,2) NOT NULL,
-            status ENUM('lunas','belum') DEFAULT 'belum',
-            catatan TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )";
-        $pdo->exec($sql_cicilan);
-        logger("✅ Tabel 'cicilan' berhasil di-reset ulang dengan struktur baru.");
+            // 5. SELESAI
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+            $pdo->commit();
 
-        // --- 4. BERSIHKAN ANGGOTA (SISAKAN ADMIN) ---
-        // Hapus semua user yang role-nya BUKAN admin
-        $sql_del_user = "DELETE FROM anggota WHERE role != 'admin'";
-        $stmt_user = $pdo->prepare($sql_del_user);
-        $stmt_user->execute();
-        $count_deleted = $stmt_user->rowCount();
-        
-        logger("✅ Tabel 'anggota' dibersihkan. $count_deleted akun (Siswa/Guru/Staff) dihapus. Admin aman.");
+            logger("✅ <b>FACTORY RESET SUKSES!</b> Sistem kini bersih seperti baru.", "success");
+            echo "<br><center><a href='index.php' class='btn-back'>KEMBALI KE DASHBOARD</a></center>";
 
-        // Hidupkan kembali foreign key checks
-        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
-
-        echo "<hr>";
-        echo "<h2 style='color:green;'>🎉 RESET COMPLETE! Sistem Siap Digunakan Dari Nol.</h2>";
-        echo "<a href='index.php' class='btn-back'>&larr; Kembali ke Dashboard</a>";
-
-    } catch (PDOException $e) {
-        logger("❌ TERJADI ERROR: " . $e->getMessage(), 'error');
+        } catch(Exception $e) {
+            $pdo->rollBack();
+            logger("❌ TERJADI ERROR: " . $e->getMessage(), "error");
+        }
     }
-}
-?>
+    ?>
+    </div>
+
 </body>
 </html>
