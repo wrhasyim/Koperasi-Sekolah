@@ -76,4 +76,17 @@ function displayFlash(){
         ";
     }
 }
+
+function getPengaturan($pdo, $kunci) {
+    $stmt = $pdo->prepare("SELECT nilai FROM pengaturan WHERE kunci = ?");
+    $stmt->execute([$kunci]);
+    $res = $stmt->fetch();
+    return $res ? $res['nilai'] : ''; // Return string kosong jika tidak ada
+}
+
+// Ambil semua pengaturan sekaligus (biar hemat query)
+function getAllPengaturan($pdo) {
+    $stmt = $pdo->query("SELECT kunci, nilai FROM pengaturan");
+    return $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // Output: ['header_nama' => '...', 'persen_staff' => 20]
+}
 ?>

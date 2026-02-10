@@ -3,6 +3,9 @@
 require_once '../../config/database.php';
 require_once '../../config/functions.php';
 
+// AMBIL PENGATURAN (Untuk Header & Persentase)
+$set = getAllPengaturan($pdo);
+
 // 1. AMBIL PARAMETER
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
@@ -23,7 +26,7 @@ foreach($transaksi as $t){
 }
 $surplus = $total_masuk - $total_keluar;
 
-// 3. TENTUKAN JUDUL & NOMINAL
+// 3. TENTUKAN JUDUL & NOMINAL (DINAMIS DARI DB)
 $judul = "";
 $nominal = 0;
 $persen = "";
@@ -32,26 +35,26 @@ $penerima_ket = "";
 switch($tipe){
     case 'staff':
         $judul = "HONORARIUM STAFF / PETUGAS";
-        $persen = "20%";
-        $nominal = $surplus * 0.20;
+        $persen = $set['persen_staff'];
+        $nominal = $surplus * ($persen / 100);
         $penerima_ket = "Perwakilan Staff";
         break;
     case 'pengurus':
         $judul = "HONORARIUM PENGURUS KOPERASI";
-        $persen = "15%";
-        $nominal = $surplus * 0.15;
+        $persen = $set['persen_pengurus'];
+        $nominal = $surplus * ($persen / 100);
         $penerima_ket = "Perwakilan Pengurus";
         break;
     case 'pembina':
         $judul = "HONORARIUM PEMBINA";
-        $persen = "5%";
-        $nominal = $surplus * 0.05;
+        $persen = $set['persen_pembina'];
+        $nominal = $surplus * ($persen / 100);
         $penerima_ket = "Pembina Koperasi";
         break;
     case 'dansos':
         $judul = "DANA SOSIAL (DANSOS)";
-        $persen = "10%";
-        $nominal = $surplus * 0.10;
+        $persen = $set['persen_dansos'];
+        $nominal = $surplus * ($persen / 100);
         $penerima_ket = "Pengelola Dansos";
         break;
 }
@@ -98,7 +101,8 @@ function terbilang($nilai) {
         body { font-family: 'Times New Roman', serif; padding: 40px; }
         .voucher { border: 2px solid #000; padding: 30px; width: 100%; max-width: 800px; margin: 0 auto; }
         .header { text-align: center; border-bottom: 2px double #000; padding-bottom: 10px; margin-bottom: 30px; }
-        .header h2 { margin: 0; text-transform: uppercase; }
+        .header h2 { margin: 0; text-transform: uppercase; font-size: 18pt; }
+        .header p { margin: 5px 0 0; font-size: 10pt; }
         .row { display: flex; margin-bottom: 15px; align-items: flex-start; }
         .label { width: 180px; font-weight: bold; }
         .sep { width: 20px; }
@@ -118,8 +122,11 @@ function terbilang($nilai) {
 
     <div class="voucher">
         <div class="header">
-            <h2>KOPERASI SEKOLAH</h2>
-            <h3 style="margin: 5px 0 0;">BUKTI PENGELUARAN KAS</h3>
+            <h2><?= strtoupper($set['header_nama']) ?></h2>
+            <p><?= $set['header_alamat'] ?></p>
+            <p><?= $set['header_kontak'] ?></p>
+            <hr style="margin-top: 15px; border-top: 1px solid #000;">
+            <h3 style="margin: 15px 0 0; text-decoration: underline;">BUKTI PENGELUARAN KAS</h3>
         </div>
 
         <div class="row">
@@ -137,7 +144,7 @@ function terbilang($nilai) {
         <div class="row">
             <div class="label">Untuk Pembayaran</div>
             <div class="sep">:</div>
-            <div class="val"><?= $judul ?> (Alokasi <?= $persen ?> dari Surplus Kas)</div>
+            <div class="val"><?= $judul ?> (Alokasi <?= $persen ?>% dari Surplus Kas)</div>
         </div>
 
         <div class="row">

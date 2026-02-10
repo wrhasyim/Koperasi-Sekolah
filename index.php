@@ -140,6 +140,10 @@ $base_url = "$protocol://$host$path/";
             <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' ?'active':'' ?>">
                 <i class="fas fa-fw fa-book"></i> <span>Laporan Kas Koperasi</span>
             </a>
+            
+            <a href="kas/rekap_honor" class="nav-link <?= $page=='kas/rekap_honor' ?'active':'' ?>">
+                <i class="fas fa-fw fa-hand-holding-usd"></i> <span>Rekap Honor & Dansos</span>
+            </a>
 
             <a href="kas/laporan_distribusi" class="nav-link <?= $page=='kas/laporan_distribusi'?'active':'' ?>">
                 <i class="fas fa-fw fa-file-contract"></i> <span>Laporan Distribusi</span>
@@ -182,6 +186,10 @@ $base_url = "$protocol://$host$path/";
         </a>
         
         <?php if($role == 'admin'): ?>
+            <a href="utilitas/pengaturan" class="nav-link <?= $page=='utilitas/pengaturan'?'active':'' ?>">
+                <i class="fas fa-fw fa-cog"></i> <span>Pengaturan Sistem</span>
+            </a>
+
             <a href="utilitas/backup" class="nav-link <?= $page=='utilitas/backup'?'active':'' ?>">
                 <i class="fas fa-fw fa-database"></i> <span>Backup Data</span>
             </a>
@@ -226,9 +234,10 @@ $base_url = "$protocol://$host$path/";
                 'kas/kas_qris',
                 'kas/kas_belanja',
                 'kas/laporan_kas',
+                'kas/rekap_honor', // [BARU] Routing Rekap Honor
                 'kas/laporan_distribusi',
                 'kas/grafik_penjualan', 
-                'laporan_rapat', // MENU BARU
+                'laporan_rapat',
                 
                 // Modul Simpanan
                 'simpanan/transaksi_simpanan',
@@ -240,6 +249,7 @@ $base_url = "$protocol://$host$path/";
                 'inventory/stok_sekolah',
                 'inventory/stok_eskul',
                 // Modul Utilitas
+                'utilitas/pengaturan', // [BARU] Routing Pengaturan
                 'utilitas/backup',
                 'utilitas/riwayat_tutup_buku',
                 // Logout
