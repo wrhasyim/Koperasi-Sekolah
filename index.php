@@ -7,6 +7,13 @@ cekLogin();
 $user = $_SESSION['user'];
 $role = $user['role'];
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
+
+// --- 1. LOGIKA BASE URL DINAMIS ---
+// Otomatis deteksi http/https dan nama folder
+$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+$host = $_SERVER['HTTP_HOST'];
+$path = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
+$base_url = "$protocol://$host$path/";
 ?>
 
 <!DOCTYPE html>
@@ -15,7 +22,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Koperasi Digital</title>
-    <base href="/ktm/"> 
+    <base href="<?= $base_url ?>"> 
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -108,7 +115,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
             </a>
             
             <a href="kas/penjualan_inventory" class="nav-link <?= $page=='kas/penjualan_inventory'?'active':'' ?>">
-                <i class="fas fa-fw fa-tags"></i> <span>Kasir Seragam & Barang</span>
+                <i class="fas fa-fw fa-tags"></i> <span>Kasir Seragam & Eskul</span>
             </a>
             
             <a href="kas/manajemen_cicilan" class="nav-link <?= $page=='kas/manajemen_cicilan'?'active':'' ?>">
@@ -183,7 +190,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
         <?php endif; ?>
 
         <div class="mt-4 pb-5 px-3">
-            <a href="process/auth_logout.php" class="btn btn-danger w-100 shadow-sm"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
+            <a href="logout" class="btn btn-danger w-100 shadow-sm"><i class="fas fa-sign-out-alt me-2"></i> Logout</a>
         </div>
     </div>
 </div>
@@ -200,11 +207,62 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 
     <div class="container-fluid p-0">
         <?php
-            $filename = "pages/" . $page . ".php";
-            if(file_exists($filename)){
-                include $filename;
+            // --- 2. SECURITY & ROUTING ---
+            
+            // Daftar Halaman yang Diizinkan (Whitelist)
+            // Ini mencegah akses file PHP sembarangan via URL
+            $allowed_pages = [
+                'dashboard', 
+                'data_anggota', 
+                'profil',
+                
+                // Modul Kas
+                'kas/penjualan_inventory',
+                'kas/manajemen_cicilan',
+                'kas/kas_penjualan',
+                'kas/kas_qris',
+                'kas/kas_belanja',
+                'kas/laporan_kas',
+                'kas/laporan_distribusi',
+                
+                // Modul Simpanan
+                'simpanan/transaksi_simpanan',
+                'simpanan/laporan_simpanan',
+                
+                // Modul Inventory & Titipan
+                'titipan/titipan',
+                'titipan/laporan_titipan',
+                'inventory/stok_koperasi',
+                'inventory/stok_sekolah',
+                'inventory/stok_eskul',
+                
+                // Modul Utilitas
+                'utilitas/backup',
+                'utilitas/riwayat_tutup_buku',
+                
+                // Logout
+                'logout'
+            ];
+
+            // Cek apakah halaman diminta ada di whitelist
+            if(in_array($page, $allowed_pages)){
+                
+                // Handle Logout Khusus
+                if($page == 'logout'){
+                    include 'process/auth_logout.php';
+                    exit;
+                }
+
+                $filename = "pages/" . $page . ".php";
+                if(file_exists($filename)){
+                    include $filename;
+                } else {
+                    echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-muted mb-3'><i class='fas fa-exclamation-triangle'></i></div><h3 class='text-muted'>File Tidak Ditemukan</h3><p class='text-muted'>File <b>pages/$page.php</b> belum dibuat.</p></div></div>";
+                }
+
             } else {
-                echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-muted mb-3'><i class='fas fa-exclamation-circle'></i></div><h3 class='text-muted'>Halaman Tidak Ditemukan</h3><p class='text-muted'>File <b>pages/$page.php</b> belum dibuat.</p></div></div>";
+                // Halaman Tidak Diizinkan / Tidak Ada
+                echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-danger mb-3'><i class='fas fa-ban'></i></div><h3 class='text-danger'>Akses Ditolak</h3><p class='text-muted'>Halaman tidak ditemukan atau Anda tidak memiliki akses.</p><a href='dashboard' class='btn btn-primary mt-3'>Kembali ke Dashboard</a></div></div>";
             }
         ?>
     </div>
