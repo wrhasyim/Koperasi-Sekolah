@@ -26,6 +26,7 @@ $base_url = "$protocol://$host$path/";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
@@ -132,16 +133,20 @@ $base_url = "$protocol://$host$path/";
             </a>
             <?php endif; ?>
             
-            <a href="kas/laporan_kas?mode=penjualan" class="nav-link <?= isset($_GET['mode']) && $_GET['mode']=='penjualan' ?'active':'' ?>">
-                <i class="fas fa-fw fa-chart-line"></i> <span>Grafik Penjualan</span>
+            <a href="kas/grafik_penjualan" class="nav-link <?= $page=='kas/grafik_penjualan' ?'active':'' ?>">
+                <i class="fas fa-fw fa-chart-line"></i> <span>Grafik Keuangan</span>
             </a>
 
-            <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' && !isset($_GET['mode']) ?'active':'' ?>">
+            <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' ?'active':'' ?>">
                 <i class="fas fa-fw fa-book"></i> <span>Laporan Kas Koperasi</span>
             </a>
 
             <a href="kas/laporan_distribusi" class="nav-link <?= $page=='kas/laporan_distribusi'?'active':'' ?>">
                 <i class="fas fa-fw fa-file-contract"></i> <span>Laporan Distribusi</span>
+            </a>
+
+            <a href="laporan_rapat" class="nav-link <?= $page=='laporan_rapat'?'active':'' ?>">
+                <i class="fas fa-fw fa-briefcase"></i> <span>Laporan Rapat</span>
             </a>
 
             <a href="simpanan/laporan_simpanan" class="nav-link <?= $page=='simpanan/laporan_simpanan'?'active':'' ?>">
@@ -209,7 +214,7 @@ $base_url = "$protocol://$host$path/";
             // [BARU] PANGGIL FLASH MESSAGE DISINI
             displayFlash();
 
-            // --- 2. SECURITY & ROUTING ---
+            // --- 2. SECURITY & ROUTING (WHITELIST) ---
             $allowed_pages = [
                 'dashboard', 
                 'data_anggota', 
@@ -222,6 +227,9 @@ $base_url = "$protocol://$host$path/";
                 'kas/kas_belanja',
                 'kas/laporan_kas',
                 'kas/laporan_distribusi',
+                'kas/grafik_penjualan', 
+                'laporan_rapat', // MENU BARU
+                
                 // Modul Simpanan
                 'simpanan/transaksi_simpanan',
                 'simpanan/laporan_simpanan',

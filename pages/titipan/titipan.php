@@ -1,296 +1,425 @@
 <?php
-// --- PROSES PHP ---
-
-// 1. TAMBAH BARANG BARU
+// --- 1. LOGIKA TAMBAH BARANG BARU ---
 if(isset($_POST['tambah_titipan'])){
-    $anggota_id = $_POST['anggota_id'];
-    $nama_barang = $_POST['nama_barang'];
-    $stok = $_POST['stok'];
-    $modal = $_POST['harga_modal'];
-    $jual = $_POST['harga_jual'];
-    $tgl = date('Y-m-d');
-
-    $sql = "INSERT INTO titipan (anggota_id, nama_barang, tanggal_titip, stok_awal, harga_modal, harga_jual) 
-            VALUES (?, ?, ?, ?, ?, ?)";
-    $pdo->prepare($sql)->execute([$anggota_id, $nama_barang, $tgl, $stok, $modal, $jual]);
+    $id_guru    = $_POST['anggota_id'];
+    $nama_brg   = htmlspecialchars($_POST['nama_barang']);
+    $modal      = (float) $_POST['harga_modal'];
+    $jual       = (float) $_POST['harga_jual'];
+    $stok       = (int) $_POST['stok_awal'];
     
-    echo "<script>alert('Barang Baru Berhasil Ditambahkan!'); window.location='titipan/titipan?guru_id=$anggota_id';</script>";
-}
-
-// 2. RESTOCK BARANG
-if(isset($_POST['restock_barang'])){
-    $id = $_POST['titipan_id'];
-    $guru_redirect = $_POST['guru_id_redirect'];
-    $tambah_stok = $_POST['tambah_stok'];
-
-    if($tambah_stok < 1){
-        echo "<script>alert('Error: Jumlah restock minimal 1!'); window.location='titipan/titipan?guru_id=$guru_redirect';</script>";
+    if($modal >= $jual) {
+        setFlash('danger', 'Harga Modal harus lebih kecil dari Harga Jual!');
     } else {
-        $pdo->prepare("UPDATE titipan SET stok_awal = stok_awal + ? WHERE id = ?")->execute([$tambah_stok, $id]);
-        echo "<script>alert('Restock Berhasil! Stok bertambah $tambah_stok pcs'); window.location='titipan/titipan?guru_id=$guru_redirect';</script>";
+        $stmt = $pdo->prepare("INSERT INTO titipan (anggota_id, nama_barang, harga_modal, harga_jual, stok_awal, stok_terjual, tanggal_titip) VALUES (?, ?, ?, ?, ?, 0, CURDATE())");
+        $stmt->execute([$id_guru, $nama_brg, $modal, $jual, $stok]);
+        setFlash('success', 'Barang titipan baru berhasil ditambahkan.');
+        echo "<script>window.location='titipan/titipan';</script>";
     }
 }
 
-// 3. UPDATE STOK (STOCK OPNAME)
-if(isset($_POST['update_sisa_fisik'])){
-    $id = $_POST['titipan_id'];
-    $guru_redirect = $_POST['guru_id_redirect'];
-    $sisa_fisik_baru = $_POST['sisa_fisik']; 
-    
-    $cek = $pdo->prepare("SELECT stok_awal, stok_terjual FROM titipan WHERE id=?");
-    $cek->execute([$id]);
-    $dt = $cek->fetch();
-    
-    $stok_awal = $dt['stok_awal'];
-    $terjual_lama = $dt['stok_terjual'];
-    $sisa_lama = $stok_awal - $terjual_lama;
+// --- 2. LOGIKA RESTOCK (ISI ULANG) ---
+if(isset($_POST['restock_barang'])){
+    $id_titipan  = $_POST['id_titipan'];
+    $tambah_stok = (int) $_POST['tambah_stok'];
 
-    // Validasi
-    if($sisa_fisik_baru > $stok_awal){
-        echo "<script>alert('ERROR: Sisa fisik tidak boleh melebihi Stok Awal ($stok_awal)! Lakukan Restock jika barang bertambah.'); window.location='titipan/titipan?guru_id=$guru_redirect';</script>";
-    } 
-    elseif($sisa_fisik_baru > $sisa_lama){
-        echo "<script>alert('ERROR: Sisa fisik bertambah (Dari $sisa_lama jadi $sisa_fisik_baru)? Gunakan tombol RESTOCK untuk menambah barang.'); window.location='titipan/titipan?guru_id=$guru_redirect';</script>";
-    } 
-    else {
-        $terjual_baru = $stok_awal - $sisa_fisik_baru;
-        $pdo->prepare("UPDATE titipan SET stok_terjual = ? WHERE id = ?")->execute([$terjual_baru, $id]);
-        echo "<script>alert('Stock Opname Berhasil! Total Laku: $terjual_baru pcs'); window.location='titipan/titipan?guru_id=$guru_redirect';</script>";
+    if($tambah_stok > 0){
+        $pdo->prepare("UPDATE titipan SET stok_awal = stok_awal + ?, tanggal_titip = CURDATE() WHERE id = ?")
+            ->execute([$tambah_stok, $id_titipan]);
+        setFlash('success', "Stok berhasil ditambahkan +$tambah_stok.");
+        echo "<script>window.location='titipan/titipan';</script>";
     }
 }
 
-// --- QUERY DATA ---
-$guru_id = isset($_GET['guru_id']) ? $_GET['guru_id'] : '';
-$where_clause = "";
-if($guru_id != '') { $where_clause = "WHERE t.anggota_id = '$guru_id'"; }
+// --- 3. LOGIKA RETUR / PENARIKAN BARANG (BARU) ---
+if(isset($_POST['tarik_barang'])){
+    $id_titipan   = $_POST['id_titipan'];
+    $jumlah_tarik = (int) $_POST['jumlah_tarik'];
+    $stok_sisa    = (int) $_POST['stok_sisa_hidden'];
+    $alasan       = $_POST['alasan']; // Opsional (Basi/Ditarik)
 
-$query = "SELECT t.*, a.nama_lengkap 
-          FROM titipan t 
-          JOIN anggota a ON t.anggota_id = a.id 
-          $where_clause
-          ORDER BY a.nama_lengkap ASC, t.nama_barang ASC";
-$data = $pdo->query($query)->fetchAll();
+    if($jumlah_tarik > $stok_sisa){
+        setFlash('danger', "Gagal! Jumlah penarikan ($jumlah_tarik) melebihi sisa stok yang ada ($stok_sisa).");
+    } else {
+        // Kurangi Stok Awal (Tanpa mempengaruhi keuangan)
+        $pdo->prepare("UPDATE titipan SET stok_awal = stok_awal - ? WHERE id = ?")
+            ->execute([$jumlah_tarik, $id_titipan]);
+        
+        setFlash('warning', "Berhasil menarik <b>$jumlah_tarik pcs</b> barang dari gudang. (Alasan: $alasan)");
+        echo "<script>window.location='titipan/titipan';</script>";
+    }
+}
 
-$anggota = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'pengurus') AND status_aktif = 1 ORDER BY nama_lengkap ASC")->fetchAll();
+// --- 4. LOGIKA CEK BARANG (INPUT SISA FISIK) ---
+if(isset($_POST['update_sisa'])){
+    $id_titipan = $_POST['id_titipan'];
+    $sisa_fisik = (int) $_POST['sisa_fisik'];
+    $stok_awal  = (int) $_POST['stok_awal_hidden'];
+
+    if($sisa_fisik > $stok_awal){
+        setFlash('danger', "Error: Sisa fisik ($sisa_fisik) melebihi catatan stok awal ($stok_awal).");
+    } else {
+        $terjual = $stok_awal - $sisa_fisik;
+        $pdo->prepare("UPDATE titipan SET stok_terjual = ? WHERE id = ?")->execute([$terjual, $id_titipan]);
+        setFlash('success', "Data diupdate. Terhitung laku: <b>$terjual pcs</b>");
+        echo "<script>window.location='titipan/titipan';</script>";
+    }
+}
+
+// --- 5. LOGIKA PEMBAYARAN (SETOR KE GURU) ---
+if(isset($_POST['bayar_guru'])){
+    $id_titipan = $_POST['id_titipan_bayar'];
+    $nama_guru  = $_POST['nama_guru_bayar'];
+    $nama_brg   = $_POST['nama_barang_bayar'];
+    $jml_terjual= (int) $_POST['jml_terjual_bayar'];
+    $harga_modal= (float) $_POST['harga_modal_bayar']; 
+    
+    $total_bayar = $jml_terjual * $harga_modal;
+    $tanggal     = date('Y-m-d');
+    $user_id     = $_SESSION['user']['id'];
+
+    if($total_bayar > 0){
+        try {
+            $pdo->beginTransaction();
+
+            $ket = "Setor Titipan: $nama_brg ($jml_terjual pcs) - $nama_guru";
+            $sql_kas = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) 
+                        VALUES (?, 'pembayaran_titipan', 'keluar', ?, ?, ?)";
+            $pdo->prepare($sql_kas)->execute([$tanggal, $total_bayar, $ket, $user_id]);
+
+            $pdo->prepare("UPDATE titipan SET stok_awal = stok_awal - stok_terjual, stok_terjual = 0 WHERE id = ?")
+                ->execute([$id_titipan]);
+
+            $pdo->commit();
+            setFlash('success', "Pembayaran <b>Rp ".number_format($total_bayar)."</b> ke $nama_guru berhasil.");
+            echo "<script>window.location='titipan/titipan?tab=bayar';</script>"; 
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            setFlash('danger', 'Error: ' . $e->getMessage());
+        }
+    }
+}
+
+// --- VIEW DATA ---
+$tab = isset($_GET['tab']) ? $_GET['tab'] : 'stok';
+$guru = $pdo->query("SELECT * FROM anggota WHERE role IN ('guru', 'staff') ORDER BY nama_lengkap ASC")->fetchAll();
+
+// Data Stok
+$data_stok = $pdo->query("SELECT t.*, a.nama_lengkap as nama_guru FROM titipan t JOIN anggota a ON t.anggota_id = a.id ORDER BY a.nama_lengkap ASC")->fetchAll();
+
+// Data Tagihan
+$data_bayar = $pdo->query("SELECT t.*, a.nama_lengkap as nama_guru FROM titipan t JOIN anggota a ON t.anggota_id = a.id WHERE t.stok_terjual > 0 ORDER BY a.nama_lengkap ASC")->fetchAll();
+
+// Total Kewajiban
+$total_tagihan_pending = 0;
+foreach($data_bayar as $d) $total_tagihan_pending += ($d['stok_terjual'] * $d['harga_modal']);
 ?>
 
-<div class="d-flex justify-content-between flex-wrap align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Inventory</h6>
-        <h2 class="h3 fw-bold mb-0">Konsinyasi Guru</h2>
+        <h2 class="h3 fw-bold mb-0">Titipan Guru</h2>
     </div>
-    <button class="btn btn-primary shadow-sm rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#modalTitip">
+    
+    <?php if($tab == 'stok'): ?>
+    <button class="btn btn-primary shadow-sm rounded-pill fw-bold" data-bs-toggle="modal" data-bs-target="#modalTambah">
         <i class="fas fa-plus me-2"></i> Barang Baru
     </button>
+    <?php endif; ?>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body bg-light rounded-3 p-3">
-        <form method="GET" action="titipan/titipan" class="row g-2 align-items-center">
-            <div class="col-auto">
-                <label class="fw-bold text-muted small text-uppercase"><i class="fas fa-filter me-2"></i>Filter Guru:</label>
-            </div>
-            <div class="col-auto flex-grow-1">
-                <select name="guru_id" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                    <option value="">-- Tampilkan Semua Barang --</option>
-                    <?php foreach($anggota as $a): ?>
-                    <option value="<?= $a['id'] ?>" <?= $guru_id == $a['id'] ? 'selected' : '' ?>>
-                        <?= $a['nama_lengkap'] ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </form>
-    </div>
-</div>
+<ul class="nav nav-pills mb-4 bg-white p-2 rounded shadow-sm border">
+    <li class="nav-item">
+        <a class="nav-link <?= $tab=='stok' ? 'active fw-bold' : 'text-dark' ?>" href="titipan/titipan?tab=stok">
+            <i class="fas fa-boxes me-2"></i> Cek Stok Fisik
+        </a>
+    </li>
+    <li class="nav-item position-relative">
+        <a class="nav-link <?= $tab=='bayar' ? 'active fw-bold bg-success text-white' : 'text-dark' ?>" href="titipan/titipan?tab=bayar">
+            <i class="fas fa-money-bill-wave me-2"></i> Pembayaran
+            <?php if($total_tagihan_pending > 0): ?>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    <?= count($data_bayar) ?>
+                </span>
+            <?php endif; ?>
+        </a>
+    </li>
+</ul>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
+<?php if($tab == 'stok'): ?>
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white py-3">
+            <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-clipboard-list me-2"></i> Data Barang Titipan</h6>
+        </div>
         <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="bg-light text-secondary small">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
                     <tr>
-                        <?php if($guru_id == ''): ?><th class="ps-4">Pemilik</th><?php endif; ?>
-                        <th class="<?= $guru_id != '' ? 'ps-4' : '' ?>">Barang</th>
-                        <th class="text-center bg-warning bg-opacity-10 text-dark border-start border-end">SISA FISIK</th>
-                        <th class="text-center">Stok Awal</th>
-                        <th class="text-center">Terjual</th>
-                        <th class="text-end">Wajib Setor</th>
-                        <th class="text-center pe-4" style="min-width: 180px;">Aksi</th>
+                        <th class="ps-4">Barang & Pemilik</th>
+                        <th class="text-center">Sisa Stok</th>
+                        <th class="text-center bg-warning bg-opacity-10">Laku</th>
+                        <th class="text-center pe-4">Aksi Gudang</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php 
-                    $total_hak_guru = 0; $total_laba = 0;
-                    if(empty($data)): ?><tr><td colspan="7" class="text-center py-5 text-muted">Tidak ada data barang titipan.</td></tr><?php endif;
-
-                    foreach($data as $row): 
-                        $sisa = $row['stok_awal'] - $row['stok_terjual'];
-                        $hak_guru = $row['stok_terjual'] * $row['harga_modal'];
-                        $laba = $row['stok_terjual'] * ($row['harga_jual'] - $row['harga_modal']);
-                        $total_hak_guru += $hak_guru; $total_laba += $laba;
+                    <?php if(empty($data_stok)): ?>
+                        <tr><td colspan="4" class="text-center py-5 text-muted">Belum ada barang.</td></tr>
+                    <?php endif; 
+                    foreach($data_stok as $row): 
+                        $sisa_sekarang = $row['stok_awal'] - $row['stok_terjual'];
                     ?>
                     <tr>
-                        <?php if($guru_id == ''): ?>
                         <td class="ps-4">
-                            <div class="d-flex align-items-center">
-                                <div class="avatar-circle me-2 bg-primary bg-opacity-10 text-primary" style="width:32px; height:32px; font-size:12px;">
-                                    <?= strtoupper(substr($row['nama_lengkap'], 0, 1)) ?>
-                                </div>
-                                <span class="fw-bold text-dark small"><?= htmlspecialchars($row['nama_lengkap']) ?></span>
-                            </div>
-                        </td>
-                        <?php endif; ?>
-                        
-                        <td class="<?= $guru_id != '' ? 'ps-4' : '' ?>">
-                            <span class="d-block text-dark fw-bold"><?= htmlspecialchars($row['nama_barang']) ?></span>
-                            <small class="text-muted" style="font-size: 0.75rem;">
-                                Modal: <?= number_format($row['harga_modal']) ?>
-                            </small>
+                            <span class="fw-bold text-dark d-block"><?= htmlspecialchars($row['nama_barang']) ?></span>
+                            <small class="text-muted"><i class="fas fa-user me-1"></i> <?= htmlspecialchars($row['nama_guru']) ?></small>
                         </td>
                         
-                        <td class="text-center bg-warning bg-opacity-10 border-start border-end">
-                            <?php if($sisa <= 0): ?>
-                                <span class="badge bg-danger shadow-sm px-3">HABIS</span>
+                        <td class="text-center">
+                            <?php if($sisa_sekarang > 0): ?>
+                                <span class="fw-bold text-primary fs-5"><?= $sisa_sekarang ?></span>
                             <?php else: ?>
-                                <span class="fw-bold fs-5 text-dark"><?= $sisa ?></span>
+                                <span class="badge bg-danger">HABIS</span>
                             <?php endif; ?>
                         </td>
 
-                        <td class="text-center text-muted"><?= $row['stok_awal'] ?></td>
-                        <td class="text-center text-success fw-bold"><?= $row['stok_terjual'] ?></td>
-                        <td class="text-end text-dark fw-bold"><?= formatRp($hak_guru) ?></td>
-                        
+                        <td class="text-center bg-warning bg-opacity-10">
+                            <?php if($row['stok_terjual'] > 0): ?>
+                                <span class="text-success fw-bold">+<?= $row['stok_terjual'] ?></span>
+                            <?php else: ?>
+                                <span class="text-muted">-</span>
+                            <?php endif; ?>
+                        </td>
+
                         <td class="text-center pe-4">
-                            <div class="btn-group shadow-sm rounded-pill">
-                                <button class="btn btn-sm btn-success px-3" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Tambah Stok">
-                                    <i class="fas fa-plus"></i>
+                            <div class="d-flex gap-2 justify-content-center">
+                                <button class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalRestock<?= $row['id'] ?>" title="Isi Ulang">
+                                    <i class="fas fa-plus-circle"></i>
                                 </button>
 
-                                <?php if($sisa > 0): ?>
-                                <button class="btn btn-sm btn-outline-primary px-3" data-bs-toggle="modal" data-bs-target="#modalUpdate<?= $row['id'] ?>" title="Stock Opname">
-                                    <i class="fas fa-check"></i>
-                                </button>
+                                <?php if($sisa_sekarang > 0): ?>
+                                    <button class="btn btn-sm btn-outline-dark fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalCek<?= $row['id'] ?>" title="Hitung Sisa">
+                                        <i class="fas fa-search me-1"></i> Cek
+                                    </button>
+                                    
+                                    <button class="btn btn-sm btn-outline-danger fw-bold" data-bs-toggle="modal" data-bs-target="#modalRetur<?= $row['id'] ?>" title="Retur Barang Basi/Tarik">
+                                        <i class="fas fa-reply"></i>
+                                    </button>
                                 <?php endif; ?>
                             </div>
-                            
+
                             <div class="modal fade" id="modalRestock<?= $row['id'] ?>" tabindex="-1">
-                                <div class="modal-dialog modal-dialog-centered modal-sm">
+                                <div class="modal-dialog modal-sm modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow">
+                                        <form method="POST">
+                                            <div class="modal-header border-0 pb-0"><h6 class="modal-title fw-bold">Isi Ulang Stok</h6></div>
+                                            <div class="modal-body text-center">
+                                                <input type="hidden" name="id_titipan" value="<?= $row['id'] ?>">
+                                                <small class="d-block text-muted mb-2"><?= $row['nama_barang'] ?></small>
+                                                <input type="number" name="tambah_stok" class="form-control text-center border-primary fw-bold fs-4" placeholder="+ Qty" min="1" required>
+                                            </div>
+                                            <div class="modal-footer border-0 pt-0"><button type="submit" name="restock_barang" class="btn btn-primary w-100 btn-sm">Simpan</button></div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <?php if($sisa_sekarang > 0): ?>
+                            <div class="modal fade" id="modalCek<?= $row['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog modal-sm modal-dialog-centered">
                                     <div class="modal-content border-0 shadow-lg rounded-4">
                                         <form method="POST">
-                                            <div class="modal-body p-4 text-start">
-                                                <h6 class="fw-bold mb-3 text-center text-success"><i class="fas fa-plus-circle me-1"></i> Restock Barang</h6>
-                                                <input type="hidden" name="titipan_id" value="<?= $row['id'] ?>">
-                                                <input type="hidden" name="guru_id_redirect" value="<?= $guru_id ?>">
-                                                
-                                                <p class="small text-center text-muted mb-2">
-                                                    Menambah stok <strong><?= htmlspecialchars($row['nama_barang']) ?></strong>
-                                                </p>
-
-                                                <div class="bg-success bg-opacity-10 p-3 rounded-3 mb-3 border border-success border-opacity-25">
-                                                    <label class="form-label small fw-bold text-success mb-1">Jumlah Masuk:</label>
-                                                    <input type="number" name="tambah_stok" class="form-control form-control-lg fw-bold text-center border-0 shadow-sm text-success" placeholder="0" min="1" required>
-                                                </div>
-                                                
-                                                <button type="submit" name="restock_barang" class="btn btn-success w-100 fw-bold py-2 rounded-3">Simpan Restock</button>
+                                            <div class="modal-header bg-dark text-white border-0">
+                                                <h6 class="modal-title fw-bold">Hitung Sisa Fisik</h6>
+                                            </div>
+                                            <div class="modal-body text-center p-4">
+                                                <input type="hidden" name="id_titipan" value="<?= $row['id'] ?>">
+                                                <input type="hidden" name="stok_awal_hidden" value="<?= $row['stok_awal'] ?>">
+                                                <p class="mb-1 small text-muted">Stok Tercatat (Awal)</p>
+                                                <h2 class="fw-bold text-dark mb-3"><?= $row['stok_awal'] ?></h2>
+                                                <label class="form-label fw-bold text-primary small">SISA DI RAK ADA BERAPA?</label>
+                                                <input type="number" name="sisa_fisik" class="form-control form-control-lg text-center fw-bold border-primary" 
+                                                       value="<?= $sisa_sekarang ?>" min="0" max="<?= $row['stok_awal'] ?>" required>
+                                                <div class="form-text small mt-2">Sistem akan otomatis menghitung jumlah terjual.</div>
+                                            </div>
+                                            <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                                                <button type="submit" name="update_sisa" class="btn btn-dark w-100 fw-bold rounded-pill">Simpan Data</button>
                                             </div>
                                         </form>
                                     </div>
                                 </div>
                             </div>
 
-                            <?php if($sisa > 0): ?>
-                            <div class="modal fade" id="modalUpdate<?= $row['id'] ?>" tabindex="-1">
-                                <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal fade" id="modalRetur<?= $row['id'] ?>" tabindex="-1">
+                                <div class="modal-dialog modal-sm modal-dialog-centered">
                                     <div class="modal-content border-0 shadow-lg rounded-4">
                                         <form method="POST">
-                                            <div class="modal-body p-4 text-start">
-                                                <h6 class="fw-bold mb-3 text-center text-primary"><i class="fas fa-clipboard-check me-1"></i> Stock Opname</h6>
-                                                <input type="hidden" name="titipan_id" value="<?= $row['id'] ?>">
-                                                <input type="hidden" name="guru_id_redirect" value="<?= $guru_id ?>">
+                                            <div class="modal-header bg-danger text-white border-0">
+                                                <h6 class="modal-title fw-bold">Retur / Tarik Barang</h6>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <input type="hidden" name="id_titipan" value="<?= $row['id'] ?>">
+                                                <input type="hidden" name="stok_sisa_hidden" value="<?= $sisa_sekarang ?>">
                                                 
-                                                <div class="text-center mb-3">
-                                                    <span class="d-block small text-muted text-uppercase">Stok Awal</span>
-                                                    <span class="fs-1 fw-bold text-dark"><?= $row['stok_awal'] ?></span>
+                                                <div class="alert alert-light border text-danger small mb-3">
+                                                    <i class="fas fa-info-circle me-1"></i> Stok akan dikurangi tanpa mempengaruhi keuangan (karena barang dikembalikan/dibuang).
                                                 </div>
 
-                                                <div class="alert <?= $sisa==0 ? 'alert-danger' : 'alert-info' ?> py-2 small text-center mb-3">
-                                                    Sisa Terakhir: <strong><?= $sisa==0 ? 'HABIS (0)' : $sisa . ' pcs' ?></strong>
+                                                <div class="mb-2">
+                                                    <label class="small fw-bold text-muted">Jumlah Ditarik</label>
+                                                    <input type="number" name="jumlah_tarik" class="form-control text-center fw-bold border-danger" placeholder="0" min="1" max="<?= $sisa_sekarang ?>" required>
                                                 </div>
-
-                                                <div class="bg-light p-3 rounded-3 mb-3 border">
-                                                    <label class="form-label small fw-bold text-dark mb-1">Sisa Fisik di Rak:</label>
-                                                    <input type="number" name="sisa_fisik" class="form-control form-control-lg fw-bold text-center border-0 shadow-sm" value="<?= $sisa ?>" min="0" max="<?= $row['stok_awal'] ?>" required>
+                                                <div class="mb-2">
+                                                    <label class="small fw-bold text-muted">Alasan (Opsional)</label>
+                                                    <select name="alasan" class="form-select text-center small">
+                                                        <option value="Basi / Rusak">Basi / Rusak</option>
+                                                        <option value="Ditarik Pemilik">Ditarik Pemilik</option>
+                                                        <option value="Salah Input">Salah Input</option>
+                                                    </select>
                                                 </div>
-                                                
-                                                <button type="submit" name="update_sisa_fisik" class="btn btn-primary w-100 fw-bold py-2 rounded-3">Update Sisa</button>
+                                            </div>
+                                            <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                                                <button type="submit" name="tarik_barang" class="btn btn-danger w-100 fw-bold rounded-pill">Konfirmasi Retur</button>
                                             </div>
                                         </form>
                                     </div>
                                 </div>
                             </div>
                             <?php endif; ?>
+
                         </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
-        
-        <div class="card-footer bg-white border-top p-4">
-            <div class="row text-center">
-                <div class="col-6 border-end">
-                    <small class="text-muted d-block text-uppercase fw-bold ls-1">Total Wajib Setor</small>
-                    <span class="fw-bold text-dark fs-3"><?= formatRp($total_hak_guru) ?></span>
+    </div>
+
+<?php else: ?>
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card bg-success text-white border-0 shadow-sm rounded-4">
+                <div class="card-body p-4 text-center">
+                    <h6 class="text-white-50 text-uppercase fw-bold small mb-2">Total Wajib Setor</h6>
+                    <h2 class="mb-0 fw-bold"><?= formatRp($total_tagihan_pending) ?></h2>
+                    <small>Uang tunai milik guru di laci kasir</small>
                 </div>
-                <div class="col-6">
-                    <small class="text-muted d-block text-uppercase fw-bold ls-1">Estimasi Laba</small>
-                    <span class="fw-bold text-success fs-3"><?= formatRp($total_laba) ?></span>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-success"><i class="fas fa-list me-2"></i> Daftar Barang Laku (Siap Bayar)</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Guru & Barang</th>
+                                <th class="text-center">Laku</th>
+                                <th class="text-end text-danger fw-bold pe-4">Nominal Setor</th>
+                                <th class="text-center pe-4">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if(empty($data_bayar)): ?>
+                                <tr><td colspan="4" class="text-center py-5 text-muted">Tidak ada tagihan pending.</td></tr>
+                            <?php endif; 
+                            foreach($data_bayar as $row): 
+                                $bayar = $row['stok_terjual'] * $row['harga_modal'];
+                            ?>
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="fw-bold d-block text-dark"><?= htmlspecialchars($row['nama_guru']) ?></span>
+                                    <small class="text-muted"><?= htmlspecialchars($row['nama_barang']) ?></small>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-warning text-dark fs-6"><?= $row['stok_terjual'] ?> pcs</span>
+                                </td>
+                                <td class="text-end text-danger fw-bold pe-4"><?= formatRp($bayar) ?></td>
+                                <td class="text-center pe-4">
+                                    <button class="btn btn-sm btn-success fw-bold px-3 rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#modalBayar<?= $row['id'] ?>">
+                                        Bayar
+                                    </button>
+
+                                    <div class="modal fade" id="modalBayar<?= $row['id'] ?>" tabindex="-1">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                                <div class="modal-header bg-success text-white">
+                                                    <h6 class="modal-title fw-bold">Konfirmasi Setor</h6>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <form method="POST">
+                                                    <div class="modal-body p-4 text-start">
+                                                        <input type="hidden" name="id_titipan_bayar" value="<?= $row['id'] ?>">
+                                                        <input type="hidden" name="nama_guru_bayar" value="<?= $row['nama_guru'] ?>">
+                                                        <input type="hidden" name="nama_barang_bayar" value="<?= $row['nama_barang'] ?>">
+                                                        <input type="hidden" name="jml_terjual_bayar" value="<?= $row['stok_terjual'] ?>">
+                                                        <input type="hidden" name="harga_modal_bayar" value="<?= $row['harga_modal'] ?>">
+
+                                                        <div class="text-center mb-3">
+                                                            <small class="text-muted">Setorkan kepada <b><?= $row['nama_guru'] ?></b></small>
+                                                            <h2 class="fw-bold text-success mt-1"><?= formatRp($bayar) ?></h2>
+                                                            <div class="badge bg-light text-dark border mt-2"><?= $row['nama_barang'] ?> (Laku: <?= $row['stok_terjual'] ?>)</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-0 pt-0 px-4 pb-4 justify-content-center">
+                                                        <button type="submit" name="bayar_guru" class="btn btn-success w-100 rounded-pill fw-bold">Sudah Disetor</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
-</div>
+<?php endif; ?>
 
-<div class="modal fade" id="modalTitip" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
+<div class="modal fade" id="modalTambah" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header bg-primary text-white">
+                <h6 class="modal-title fw-bold">Tambah Barang Titipan</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
             <form method="POST">
-                <div class="modal-header bg-primary text-white border-0 rounded-top-4">
-                    <h5 class="modal-title fw-bold">Barang Masuk Baru</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Pemilik Barang</label>
-                        <select name="anggota_id" class="form-select bg-light border-0" required>
-                            <option value="">-- Pilih Guru --</option>
-                            <?php foreach($anggota as $a): ?>
-                            <option value="<?= $a['id'] ?>" <?= $guru_id == $a['id'] ? 'selected' : '' ?>><?= $a['nama_lengkap'] ?></option>
+                        <label class="form-label small fw-bold text-muted">Pemilik Barang</label>
+                        <select name="anggota_id" class="form-select" required>
+                            <option value="">-- Pilih Guru/Staff --</option>
+                            <?php foreach($guru as $g): ?>
+                                <option value="<?= $g['id'] ?>"><?= $g['nama_lengkap'] ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted">Nama Barang</label>
-                        <input type="text" name="nama_barang" class="form-control bg-light border-0" placeholder="Contoh: Keripik Pisang" required>
+                        <label class="form-label small fw-bold text-muted">Nama Barang</label>
+                        <input type="text" name="nama_barang" class="form-control" required>
                     </div>
-                    <div class="row">
-                        <div class="col-4 mb-3">
-                            <label class="small fw-bold text-muted">Stok Awal</label>
-                            <input type="number" name="stok" class="form-control bg-light border-0 fw-bold" required>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Harga Modal</label>
+                            <input type="number" name="harga_modal" class="form-control" required>
                         </div>
-                        <div class="col-4 mb-3">
-                            <label class="small fw-bold text-muted">Modal</label>
-                            <input type="number" name="harga_modal" class="form-control bg-light border-0" placeholder="Setor" required>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Harga Jual</label>
+                            <input type="number" name="harga_jual" class="form-control" required>
                         </div>
-                        <div class="col-4 mb-3">
-                            <label class="small fw-bold text-muted">Jual</label>
-                            <input type="number" name="harga_jual" class="form-control bg-light border-0" placeholder="Toko" required>
-                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Stok Awal</label>
+                        <input type="number" name="stok_awal" class="form-control" value="10" required>
                     </div>
                 </div>
-                <div class="modal-footer border-0 px-4 pb-4">
-                    <button type="submit" name="tambah_titipan" class="btn btn-primary w-100 fw-bold">Simpan</button>
+                <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                    <button type="submit" name="tambah_titipan" class="btn btn-primary w-100 rounded-pill fw-bold">Simpan Data</button>
                 </div>
             </form>
         </div>

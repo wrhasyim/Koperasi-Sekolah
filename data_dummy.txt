@@ -11,17 +11,17 @@ TRUNCATE TABLE simpanan;
 TRUNCATE TABLE riwayat_pengambilan;
 TRUNCATE TABLE tutup_buku;
 
--- Hapus user selain admin (ID 1)
+-- Hapus user selain admin (ID 1) agar ID bisa di-reset manual
 DELETE FROM anggota WHERE id != 1;
 
 -- 2. INSERT USER TAMBAHAN (STAFF & GURU)
--- Menggunakan INSERT IGNORE dengan ID yang dipaksa (2, 3, 4)
-INSERT IGNORE INTO `anggota` (`id`, `nama_lengkap`, `username`, `password`, `role`, `status_aktif`, `no_hp`) VALUES
+-- ID dipaksa (2, 3, 4) agar relasi ke tabel lain aman
+INSERT INTO `anggota` (`id`, `nama_lengkap`, `username`, `password`, `role`, `status_aktif`, `no_hp`) VALUES
 (2, 'Budi Santoso (Staff)', 'staff', '$2y$10$fW.1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1', 'staff', 1, '081234567891'),
 (3, 'Pak Guru Matematika', 'guru1', '$2y$10$fW.1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1', 'guru', 1, '081234567892'),
 (4, 'Bu Guru Bahasa', 'guru2', '$2y$10$fW.1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1', 'guru', 1, '081234567893');
 
--- 3. INSERT STOK KOPERASI
+-- 3. INSERT STOK KOPERASI (ATK)
 INSERT INTO `stok_koperasi` (`nama_barang`, `harga_modal`, `harga_jual`, `stok`) VALUES
 ('Pulpen Standard', 2000, 3000, 50),
 ('Buku Tulis Sinar Dunia 38', 3500, 5000, 100),
@@ -58,6 +58,7 @@ INSERT INTO `cicilan` (`nama_siswa`, `kelas`, `kategori_barang`, `nama_barang`, 
 ('Dul Jaelani', '12 MM 1', 'seragam', 'Seragam Batik - Ukuran XL', 105000, 100000, 5000, 'belum', 'Kurang 5rb lagi', DATE_SUB(NOW(), INTERVAL 10 DAY));
 
 -- 8. INSERT TRANSAKSI KAS
+-- Pastikan kategori sesuai dengan enum atau varchar yang ada
 INSERT INTO `transaksi_kas` (`tanggal`, `kategori`, `arus`, `jumlah`, `keterangan`, `user_id`) VALUES
 (CURDATE(), 'modal_awal', 'masuk', 5000000, 'Modal Awal Koperasi', 1),
 (CURDATE(), 'penjualan_seragam', 'masuk', 100000, 'Terima (tunai): Seragam Batik - Ahmad Dhani (10 TKJ 1)', 1),
@@ -69,7 +70,8 @@ INSERT INTO `transaksi_kas` (`tanggal`, `kategori`, `arus`, `jumlah`, `keteranga
 (DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'biaya_operasional', 'keluar', 15000, 'Beli Galon Air', 2),
 (DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'belanja_stok', 'keluar', 500000, 'Kulakan Keripik & ATK', 1);
 
--- 9. INSERT SIMPANAN ANGGOTA (FIXED: Tanpa user_id)
+-- 9. INSERT SIMPANAN ANGGOTA
+-- Sesuaikan kolom dengan tabel simpanan yang ada (tanpa user_id)
 INSERT INTO `simpanan` (`anggota_id`, `tanggal`, `jenis_simpanan`, `tipe_transaksi`, `jumlah`, `keterangan`) VALUES
 (3, CURDATE(), 'pokok', 'setor', 50000, 'Simpanan Pokok Guru 1'),
 (3, CURDATE(), 'wajib', 'setor', 10000, 'Simpanan Wajib Bulan Ini'),
