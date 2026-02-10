@@ -54,7 +54,9 @@ try {
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Laporan Distribusi</h6>
         <h2 class="h3 fw-bold mb-0"><?= $judul_halaman ?></h2>
     </div>
-    <button onclick="window.print()" class="btn btn-dark shadow-sm rounded-pill"><i class="fas fa-print me-2"></i> Cetak</button>
+    <a href="pages/kas/cetak_laporan_distribusi.php?tab=<?= $tab ?>&tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" target="_blank" class="btn btn-dark shadow-sm rounded-pill">
+        <i class="fas fa-print me-2"></i> Cetak
+    </a>
 </div>
 
 <ul class="nav nav-pills mb-4 bg-white p-2 rounded shadow-sm border">

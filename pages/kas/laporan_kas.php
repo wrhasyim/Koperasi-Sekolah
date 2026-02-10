@@ -23,23 +23,7 @@ foreach($transaksi as $t){
 }
 $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
 
-// LOGIKA EXPORT EXCEL
-if(isset($_GET['export_excel'])){
-    header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=Laporan_Arus_Kas_Koperasi_Murni.xls");
-    echo "TANGGAL\tKATEGORI\tKETERANGAN\tMASUK\tKELUAR\tSALDO\n";
-    
-    $saldo = 0;
-    foreach($transaksi as $row){
-        $masuk = ($row['arus'] == 'masuk') ? $row['jumlah'] : 0;
-        $keluar = ($row['arus'] == 'keluar') ? $row['jumlah'] : 0;
-        $saldo += ($masuk - $keluar);
-        
-        $kat_clean = strtoupper(str_replace('_', ' ', $row['kategori']));
-        echo $row['tanggal'] . "\t" . $kat_clean . "\t" . $row['keterangan'] . "\t" . $masuk . "\t" . $keluar . "\t" . $saldo . "\n";
-    }
-    exit;
-}
+
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -123,13 +107,14 @@ if(isset($_GET['export_excel'])){
             </div>
             
             <div class="col-auto ms-auto d-flex gap-2">
-                <a href="kas/laporan_kas?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&export_excel=true" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm">
-                    <i class="fas fa-file-excel me-2"></i> Excel
-                </a>
-                <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3 shadow-sm" onclick="window.print()">
-                    <i class="fas fa-print me-2"></i> Print
-                </button>
-            </div>
+    <a href="process/export_laporan_kas.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" target="_blank">
+        <i class="fas fa-file-excel me-2"></i> Excel
+    </a>
+    
+    <a href="pages/kas/cetak_laporan_kas.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" class="btn btn-sm btn-secondary rounded-pill px-3 shadow-sm" target="_blank">
+        <i class="fas fa-print me-2"></i> Print
+    </a>
+</div>
         </form>
     </div>
 </div>

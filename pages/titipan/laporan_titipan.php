@@ -1,103 +1,140 @@
 <?php
-// --- STYLE CSS MODERN ---
+// pages/titipan/laporan_titipan.php
+
+// --- 1. SETUP FILTER & DATA ---
+$tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
+$tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
+$guru_id  = isset($_GET['guru_id']) ? $_GET['guru_id'] : '';
+
+// Ambil Daftar Guru (Untuk Dropdown)
+$stmt_guru = $pdo->query("SELECT id, nama_lengkap FROM anggota WHERE role NOT IN ('admin', 'staff') ORDER BY nama_lengkap ASC");
+$list_guru = $stmt_guru->fetchAll();
+
+// Siapkan Query Data Utama
+$sql = "SELECT t.*, a.nama_lengkap 
+        FROM titipan t 
+        JOIN anggota a ON t.anggota_id = a.id 
+        WHERE (t.tanggal_titip BETWEEN ? AND ?)";
+
+$params = [$tgl_awal, $tgl_akhir];
+
+// Jika ada filter guru, tambahkan kondisi
+if (!empty($guru_id)) {
+    $sql .= " AND t.anggota_id = ?";
+    $params[] = $guru_id;
+}
+
+$sql .= " ORDER BY a.nama_lengkap ASC, t.tanggal_titip DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$data_titipan = $stmt->fetchAll();
+
+// --- 2. HITUNG RINGKASAN ---
+$total_stok_awal = 0;
+$total_terjual = 0;
+$total_kewajiban = 0; 
+$estimasi_laba = 0;
+
+foreach($data_titipan as $d){
+    $total_stok_awal += $d['stok_awal'];
+    $total_terjual += $d['stok_terjual'];
+    $total_kewajiban += ($d['stok_terjual'] * $d['harga_modal']);
+    $laba_per_unit = $d['harga_jual'] - $d['harga_modal'];
+    $estimasi_laba += ($laba_per_unit * $d['stok_terjual']);
+}
 ?>
+
 <style>
-    .card-modern { border: none; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); transition: all 0.3s; background: #fff; }
+    .card-modern { border: none; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); transition: all 0.3s; background: #fff; overflow: hidden; }
     .card-modern:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
-    .avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 16px; }
     .bg-gradient-primary { background: linear-gradient(45deg, #4e73df, #224abe); }
     .bg-gradient-success { background: linear-gradient(45deg, #1cc88a, #13855c); }
     .bg-gradient-warning { background: linear-gradient(45deg, #f6c23e 0%, #dda20a 100%); }
-    .table-modern th { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; color: #8898aa; border-bottom: 2px solid #e3e6f0; padding: 15px; }
-    .table-modern td { vertical-align: middle; padding: 15px; border-bottom: 1px solid #f0f0f0; }
+    .bg-gradient-info { background: linear-gradient(45deg, #36b9cc 0%, #258391 100%); }
+    .table-modern thead th { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; color: #6e707e; background-color: #f8f9fc; border-bottom: 2px solid #e3e6f0; padding: 12px 15px; }
+    .table-modern td { vertical-align: middle; padding: 12px 15px; border-bottom: 1px solid #f0f0f0; color: #5a5c69; }
 </style>
-
-<?php
-// --- LOGIKA PHP ---
-
-// 1. SETUP TANGGAL
-$tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
-$tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
-
-// 2. QUERY RIWAYAT SETORAN (Dari Transaksi Kas)
-$sql = "SELECT * FROM transaksi_kas 
-        WHERE kategori = 'pembayaran_titipan' 
-        AND (tanggal BETWEEN ? AND ?)
-        ORDER BY tanggal DESC, id DESC";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute([$tgl_awal, $tgl_akhir]);
-$riwayat = $stmt->fetchAll();
-
-// 3. HITUNG RINGKASAN
-$total_disetor = 0;
-$total_laba = 0;
-$total_transaksi = count($riwayat);
-
-foreach($riwayat as $row){
-    $total_disetor += $row['jumlah'];
-    
-    // EKSTRAK DATA LABA DARI KETERANGAN (Regex)
-    // Mencari text "[Laba: 5000]" di dalam keterangan
-    if (preg_match('/\[Laba:\s*(\d+)\]/', $row['keterangan'], $matches)) {
-        $laba_item = (int)$matches[1];
-        $total_laba += $laba_item;
-    }
-}
-?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Laporan Inventory</h6>
-        <h2 class="h3 fw-bold mb-0">Riwayat Pembayaran & Laba Titipan</h2>
+        <h2 class="h3 fw-bold mb-0 text-gray-800">Rekapitulasi Barang Titipan</h2>
     </div>
-    <button onclick="window.print()" class="btn btn-dark shadow-sm rounded-pill px-4">
-        <i class="fas fa-print me-2"></i> Cetak
-    </button>
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card card-modern bg-gradient-success text-white p-4 border-0 h-100">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="text-white-50 small text-uppercase fw-bold">Total Uang Disetor (Modal)</span>
-                    <h2 class="mb-0 fw-bold display-6 mt-2"><?= formatRp($total_disetor) ?></h2>
-                    <small class="text-white-50">Kewajiban Lunas</small>
-                </div>
-                <div class="bg-white bg-opacity-25 rounded-circle p-3">
-                    <i class="fas fa-hand-holding-usd fa-3x"></i>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-modern bg-gradient-primary text-white h-100">
+            <div class="card-body">
+                <div class="text-white-50 small text-uppercase fw-bold mb-1">Total Stok Masuk</div>
+                <div class="h3 mb-0 fw-bold"><?= number_format($total_stok_awal) ?> <span class="fs-6 fw-normal">Unit</span></div>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-6">
-        <div class="card card-modern bg-gradient-primary text-white p-4 border-0 h-100">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <span class="text-white-50 small text-uppercase fw-bold">Total Keuntungan Koperasi</span>
-                    <h2 class="mb-0 fw-bold display-6 mt-2"><?= formatRp($total_laba) ?></h2>
-                    <small class="text-white-50">Profit dari Titipan</small>
-                </div>
-                <div class="bg-white bg-opacity-25 rounded-circle p-3">
-                    <i class="fas fa-chart-line fa-3x"></i>
-                </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-modern bg-gradient-success text-white h-100">
+            <div class="card-body">
+                <div class="text-white-50 small text-uppercase fw-bold mb-1">Total Terjual</div>
+                <div class="h3 mb-0 fw-bold"><?= number_format($total_terjual) ?> <span class="fs-6 fw-normal">Unit</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-modern bg-gradient-warning text-white h-100">
+            <div class="card-body">
+                <div class="text-white-50 small text-uppercase fw-bold mb-1">Wajib Setor (Kewajiban)</div>
+                <div class="h3 mb-0 fw-bold"><?= formatRp($total_kewajiban) ?></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-modern bg-gradient-info text-white h-100">
+            <div class="card-body">
+                <div class="text-white-50 small text-uppercase fw-bold mb-1">Estimasi Laba Koperasi</div>
+                <div class="h3 mb-0 fw-bold"><?= formatRp($estimasi_laba) ?></div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body bg-light rounded-3 p-3">
-        <form method="GET" class="row g-2 align-items-center">
+<div class="card card-modern mb-4">
+    <div class="card-body py-3">
+        <form class="row g-2 align-items-center" method="GET">
             <div class="col-auto">
-                <label class="fw-bold text-muted small text-uppercase"><i class="fas fa-calendar-alt me-2"></i>Periode:</label>
+                <span class="fw-bold text-secondary small text-uppercase"><i class="fas fa-filter me-2"></i>Filter:</span>
             </div>
-            <div class="col-auto"><input type="date" name="tgl_awal" class="form-control border-0 shadow-sm" value="<?= $tgl_awal ?>"></div>
-            <div class="col-auto text-muted fw-bold">-</div>
-            <div class="col-auto"><input type="date" name="tgl_akhir" class="form-control border-0 shadow-sm" value="<?= $tgl_akhir ?>"></div>
-            <div class="col-auto"><button type="submit" class="btn btn-primary shadow-sm fw-bold px-4 rounded-pill">Tampilkan</button></div>
+            <div class="col-auto">
+                <input type="date" name="tgl_awal" class="form-control form-control-sm border-light bg-light fw-bold text-secondary" value="<?= $tgl_awal ?>">
+            </div>
+            <div class="col-auto text-muted">-</div>
+            <div class="col-auto">
+                <input type="date" name="tgl_akhir" class="form-control form-control-sm border-light bg-light fw-bold text-secondary" value="<?= $tgl_akhir ?>">
+            </div>
+            
+            <div class="col-auto ms-2">
+                <select name="guru_id" class="form-select form-select-sm border-light bg-light fw-bold text-secondary" style="min-width: 200px;">
+                    <option value="">-- Semua Guru/Penitip --</option>
+                    <?php foreach($list_guru as $g): ?>
+                        <option value="<?= $g['id'] ?>" <?= $guru_id == $g['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($g['nama_lengkap']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold shadow-sm">Terapkan</button>
+            </div>
+
+            <div class="col-auto ms-auto d-flex gap-2">
+                <a href="process/export_laporan_titipan.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&guru_id=<?= $guru_id ?>" target="_blank" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm">
+                    <i class="fas fa-file-excel me-2"></i> Excel
+                </a>
+                <a href="pages/titipan/cetak_laporan_titipan.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&guru_id=<?= $guru_id ?>" target="_blank" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">
+                    <i class="fas fa-print me-2"></i> Print
+                </a>
+            </div>
         </form>
     </div>
 </div>
@@ -105,60 +142,62 @@ foreach($riwayat as $row){
 <div class="card card-modern">
     <div class="table-responsive">
         <table class="table table-modern table-hover mb-0">
-            <thead class="bg-light">
+            <thead>
                 <tr>
-                    <th class="ps-4">Tanggal Bayar</th>
-                    <th>Detail Transaksi</th>
-                    <th class="text-end text-success">Laba Koperasi</th>
-                    <th class="text-end pe-4 text-danger">Nominal Disetor</th>
+                    <th class="ps-4">Tanggal & Barang</th>
+                    <th>Pemilik</th>
+                    <th class="text-end">Harga (Modal)</th>
+                    <th class="text-center">Awal</th>
+                    <th class="text-center">Terjual</th>
+                    <th class="text-center">Sisa</th>
+                    <th class="text-end">Wajib Setor</th>
+                    <th class="text-center pe-4">Status</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if(empty($riwayat)): ?>
-                    <tr><td colspan="4" class="text-center py-5 text-muted">Belum ada riwayat pembayaran pada periode ini.</td></tr>
+                <?php if(empty($data_titipan)): ?>
+                    <tr><td colspan="8" class="text-center py-5 text-muted">Belum ada data titipan sesuai filter.</td></tr>
                 <?php endif; 
 
-                foreach($riwayat as $row): 
-                    // Ambil laba per baris
-                    $laba_item = 0;
-                    $desc = $row['keterangan'];
+                foreach($data_titipan as $row): 
+                    $sisa = $row['stok_awal'] - $row['stok_terjual'];
+                    $wajib_setor = $row['stok_terjual'] * $row['harga_modal'];
                     
-                    // Bersihkan teks [Laba: xxx] dari tampilan user biasa agar rapi
-                    $display_desc = preg_replace('/\[Laba:\s*\d+\]/', '', $desc);
-                    
-                    if (preg_match('/\[Laba:\s*(\d+)\]/', $desc, $matches)) {
-                        $laba_item = (int)$matches[1];
-                    }
+                    $status_badge = ($row['status_bayar'] == 'lunas') 
+                        ? '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">LUNAS</span>'
+                        : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3">BELUM</span>';
                 ?>
                 <tr>
                     <td class="ps-4">
-                        <span class="fw-bold text-dark d-block"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></span>
-                        <small class="text-muted"><?= date('H:i', strtotime($row['created_at'])) ?></small>
+                        <div class="fw-bold text-dark"><?= htmlspecialchars($row['nama_barang']) ?></div>
+                        <small class="text-muted"><?= date('d/m/Y', strtotime($row['tanggal_titip'])) ?></small>
                     </td>
                     <td>
-                        <span class="d-block text-dark"><?= htmlspecialchars($display_desc) ?></span>
-                        <span class="badge bg-light text-secondary border border-opacity-25 mt-1">Lunas</span>
+                        <div class="small fw-bold text-primary"><i class="fas fa-user-circle me-1"></i> <?= htmlspecialchars($row['nama_lengkap']) ?></div>
                     </td>
-                    <td class="text-end text-success fw-bold">
-                        <?php if($laba_item > 0): ?>
-                            + <?= formatRp($laba_item) ?>
-                        <?php else: ?>
-                            <span class="text-muted small">-</span>
-                        <?php endif; ?>
+                    <td class="text-end text-muted">
+                        <?= number_format($row['harga_modal']) ?>
                     </td>
-                    <td class="text-end pe-4">
-                        <span class="fw-bold text-danger">- <?= formatRp($row['jumlah']) ?></span>
+                    <td class="text-center">
+                        <span class="badge bg-light text-dark border"><?= $row['stok_awal'] ?></span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-success bg-opacity-10 text-success fw-bold"><?= $row['stok_terjual'] ?></span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge <?= $sisa > 0 ? 'bg-danger bg-opacity-10 text-danger' : 'bg-light text-muted' ?>">
+                            <?= $sisa ?>
+                        </span>
+                    </td>
+                    <td class="text-end fw-bold text-dark">
+                        <?= formatRp($wajib_setor) ?>
+                    </td>
+                    <td class="text-center pe-4">
+                        <?= $status_badge ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
-            <tfoot class="bg-light fw-bold border-top">
-                <tr>
-                    <td colspan="2" class="text-end text-uppercase small ls-1 text-muted py-3">TOTAL</td>
-                    <td class="text-end text-success py-3"><?= formatRp($total_laba) ?></td>
-                    <td class="text-end text-danger py-3 pe-4"><?= formatRp($total_disetor) ?></td>
-                </tr>
-            </tfoot>
         </table>
     </div>
 </div>
