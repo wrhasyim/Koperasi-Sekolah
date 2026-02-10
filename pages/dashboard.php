@@ -1,20 +1,32 @@
 <?php
-// --- LOGIKA QUERY STATISTIK ---
+// --- 1. HITUNG SALDO KAS FISIK (Total Uang di Tangan) ---
+// Menghitung seluruh uang masuk dikurangi uang keluar dari semua kategori
+// Ini mencerminkan uang real yang ada di brankas/rekening
+$q_kas = $pdo->query("SELECT SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE -jumlah END) as saldo FROM transaksi_kas")->fetch();
+$kas_fisik = $q_kas['saldo'] ?? 0;
 
-// A. Saldo Kas Koperasi (Murni)
-// Kita filter: HANYA hitung yang BUKAN seragam/eskul
-$q_kas = $pdo->query("SELECT 
-                        SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE 0 END) as tm, 
-                        SUM(CASE WHEN arus = 'keluar' THEN jumlah ELSE 0 END) as tk 
-                      FROM transaksi_kas 
-                      WHERE kategori NOT IN ('penjualan_seragam', 'penjualan_eskul')")->fetch();
-$saldo_kas = $q_kas['tm'] - $q_kas['tk'];
+// --- 2. HITUNG KEWAJIBAN / DANA MENGENDAP (Uang Orang Lain) ---
+// a. Tabungan Siswa/Guru (Saldo Simpanan)
+$q_simp = $pdo->query("SELECT SUM(CASE WHEN tipe_transaksi='setor' THEN jumlah ELSE -jumlah END) as saldo FROM simpanan")->fetch();
+$total_tabungan = $q_simp['saldo'] ?? 0;
 
-// B. Total Sihara & Anggota (Tetap sama)
-$q_sihara = $pdo->query("SELECT SUM(jumlah) as total FROM simpanan WHERE jenis_simpanan='hari_raya' AND tipe_transaksi='setor'")->fetch();
+// b. Hutang Titipan (Barang laku tapi uang belum disetor ke guru)
+// Hutang = Stok Terjual * Harga Modal
+$q_titip = $pdo->query("SELECT SUM(stok_terjual * harga_modal) as hutang FROM titipan")->fetch();
+$hutang_titipan = $q_titip['hutang'] ?? 0;
+
+$total_kewajiban = $total_tabungan + $hutang_titipan;
+
+// --- 3. HITUNG DANA BEBAS (Modal Sendiri / Real Cash) ---
+// Uang yang aman dibelanjakan untuk operasional
+$dana_bebas = $kas_fisik - $total_kewajiban;
+
+// --- 4. DATA PENDUKUNG (Member & Stok) ---
+// Total Anggota Aktif
 $q_anggota = $pdo->query("SELECT COUNT(*) as total FROM anggota WHERE status_aktif=1")->fetch();
+$jml_anggota = $q_anggota['total'];
 
-// C. Stok Menipis (Hanya Koperasi & Titipan Guru) - Seragam/Eskul opsional ditampilkan
+// Stok Menipis (Logic Lama Tetap Dipertahankan)
 $limit_stok = 5;
 $stok_menipis_list = [];
 
@@ -32,15 +44,13 @@ try {
 
 $total_alert = count($stok_menipis_list);
 
-// D. Transaksi Terakhir (Hanya Koperasi)
-$recent_trx = $pdo->query("SELECT * FROM transaksi_kas 
-                           WHERE kategori NOT IN ('penjualan_seragam', 'penjualan_eskul') 
-                           ORDER BY tanggal DESC, id DESC LIMIT 5")->fetchAll();
+// Transaksi Terakhir (Menampilkan semua mutasi agar sinkron dengan Kas Fisik)
+$recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id DESC LIMIT 7")->fetchAll();
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h6 class="text-muted text-uppercase small ls-1 mb-1">Overview</h6>
+        <h6 class="text-muted text-uppercase small ls-1 mb-1">Financial Overview</h6>
         <h2 class="h3 fw-bold mb-0 text-dark">Dashboard Koperasi</h2>
     </div>
     <div class="d-none d-md-block">
@@ -51,131 +61,127 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-success text-white h-100 overflow-hidden border-0 shadow-sm">
+    <div class="col-xl-4 col-md-6">
+        <div class="card bg-primary text-white h-100 overflow-hidden border-0 shadow-lg rounded-4">
             <div class="card-body position-relative p-4">
-                <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
-                    <i class="fas fa-money-bill-wave fa-6x"></i>
-                </div>
-                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Kas Koperasi</h6>
-                <h2 class="display-6 fw-bold mb-0"><?= formatRp($saldo_kas) ?></h2>
-                <small class="text-white-50 mt-2 d-block">Dana Operasional (Liquid)</small>
+                <div class="position-absolute top-0 end-0 opacity-25 m-3"><i class="fas fa-wallet fa-5x"></i></div>
+                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Total Kas Fisik</h6>
+                <h2 class="display-6 fw-bold mb-0"><?= formatRp($kas_fisik) ?></h2>
+                <small class="text-white-50">Semua uang di laci & rekening</small>
             </div>
         </div>
     </div>
 
-    <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-primary text-white h-100 overflow-hidden border-0 shadow-sm">
+    <div class="col-xl-4 col-md-6">
+        <div class="card bg-danger text-white h-100 overflow-hidden border-0 shadow-lg rounded-4">
             <div class="card-body position-relative p-4">
-                <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
-                    <i class="fas fa-wallet fa-6x"></i>
+                <div class="position-absolute top-0 end-0 opacity-25 m-3"><i class="fas fa-hand-holding-usd fa-5x"></i></div>
+                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Dana Milik Anggota</h6>
+                <h2 class="display-6 fw-bold mb-0"><?= formatRp($total_kewajiban) ?></h2>
+                <div class="mt-2 small text-white-50 border-top pt-2" style="border-color: rgba(255,255,255,0.2) !important;">
+                    <div class="d-flex justify-content-between">
+                        <span>Tabungan:</span> <span><?= formatRp($total_tabungan) ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Titipan Pending:</span> <span><?= formatRp($hutang_titipan) ?></span>
+                    </div>
                 </div>
-                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Aset Sihara</h6>
-                <h2 class="display-6 fw-bold mb-0"><?= formatRp($q_sihara['total']) ?></h2>
-                <small class="text-white-50 mt-2 d-block">Tabungan Anggota</small>
             </div>
         </div>
     </div>
 
-    <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-info text-white h-100 overflow-hidden border-0 shadow-sm">
+    <div class="col-xl-4 col-md-6">
+        <div class="card bg-success text-white h-100 overflow-hidden border-0 shadow-lg rounded-4">
             <div class="card-body position-relative p-4">
-                <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
-                    <i class="fas fa-users fa-6x"></i>
-                </div>
-                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Total Anggota</h6>
-                <h2 class="display-6 fw-bold mb-0"><?= $q_anggota['total'] ?></h2>
-                <small class="text-white-50 mt-2 d-block">Guru & Staff Aktif</small>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-danger text-white h-100 overflow-hidden border-0 shadow-sm">
-            <div class="card-body position-relative p-4">
-                <div class="position-absolute top-0 end-0 opacity-25" style="margin-top: -10px; margin-right: -10px;">
-                    <i class="fas fa-exclamation-triangle fa-6x"></i>
-                </div>
-                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Stok Menipis</h6>
-                <h2 class="display-6 fw-bold mb-0"><?= $total_alert ?></h2>
-                <small class="text-white-50 mt-2 d-block">Perlu Restock Segera</small>
+                <div class="position-absolute top-0 end-0 opacity-25 m-3"><i class="fas fa-coins fa-5x"></i></div>
+                <h6 class="text-uppercase text-white-50 ls-1 mb-1">Modal Bebas (Aman)</h6>
+                <h2 class="display-6 fw-bold mb-0"><?= formatRp($dana_bebas) ?></h2>
+                <small class="text-white-50">Dana aman untuk belanja operasional</small>
             </div>
         </div>
     </div>
 </div>
 
 <div class="row g-4">
-    <div class="col-lg-7">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-header d-flex justify-content-between align-items-center bg-white py-3">
-                <h6 class="fw-bold text-dark m-0"><i class="fas fa-exchange-alt me-2 text-primary"></i> Transaksi Koperasi Terakhir</h6>
-                <a href="kas/laporan_kas" class="btn btn-sm btn-light rounded-pill px-3">Lihat Semua</a>
+    <div class="col-lg-8">
+        <div class="card h-100 border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-dark m-0"><i class="fas fa-exchange-alt me-2 text-primary"></i> Mutasi Kas Terakhir</h6>
+                <a href="kas/laporan_kas" class="btn btn-sm btn-outline-primary rounded-pill px-3">Lihat Semua</a>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="ps-4">Info</th>
-                                <th>Keterangan</th>
-                                <th class="text-end pe-4">Jumlah</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($recent_trx as $row): ?>
-                            <tr>
-                                <td class="ps-4">
-                                    <span class="d-block fw-bold text-dark"><?= date('d M', strtotime($row['tanggal'])) ?></span>
-                                    <small class="text-muted"><?= date('H:i', strtotime($row['created_at'])) ?></small>
-                                </td>
-                                <td>
-                                    <span class="d-block text-dark"><?= htmlspecialchars($row['keterangan']) ?></span>
-                                    <span class="badge bg-light text-secondary border border-secondary border-opacity-25 rounded-pill fw-normal" style="font-size: 0.7rem;">
-                                        <?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?>
-                                    </span>
-                                </td>
-                                <td class="text-end pe-4">
-                                    <?php if($row['arus'] == 'masuk'): ?>
-                                        <span class="text-success fw-bold">+ <?= number_format($row['jumlah']) ?></span>
-                                    <?php else: ?>
-                                        <span class="text-danger fw-bold">- <?= number_format($row['jumlah']) ?></span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Tanggal</th>
+                            <th>Keterangan</th>
+                            <th class="text-end pe-4">Nominal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($recent_trx as $row): ?>
+                        <tr>
+                            <td class="ps-4 text-muted fw-bold"><?= date('d M', strtotime($row['tanggal'])) ?></td>
+                            <td>
+                                <span class="d-block text-dark"><?= htmlspecialchars($row['keterangan']) ?></span>
+                                <span class="badge bg-light text-secondary border rounded-pill fw-normal" style="font-size: 0.7rem;">
+                                    <?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?>
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <?php if($row['arus'] == 'masuk'): ?>
+                                    <span class="text-success fw-bold">+ <?= number_format($row['jumlah']) ?></span>
+                                <?php else: ?>
+                                    <span class="text-danger fw-bold">- <?= number_format($row['jumlah']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <div class="col-lg-5">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-header bg-white py-3 border-bottom-0">
-                <h6 class="fw-bold text-danger m-0"><i class="fas fa-bell me-2"></i> Perlu Restock (<?= $total_alert ?>)</h6>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                            <i class="fas fa-users fa-lg"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0 fw-bold">Anggota Aktif</h6>
+                        <small class="text-muted">Guru & Staff</small>
+                    </div>
+                    <div class="fw-bold fs-4 text-dark"><?= $jml_anggota ?></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card h-100 border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-danger m-0"><i class="fas fa-bell me-2"></i> Perlu Restock</h6>
+                <span class="badge bg-danger rounded-pill"><?= $total_alert ?></span>
             </div>
             <div class="card-body p-0">
                 <?php if($total_alert > 0): ?>
-                <div class="table-responsive" style="max-height: 350px;">
+                <div class="table-responsive" style="max-height: 300px;">
                     <table class="table table-striped table-hover mb-0 small">
-                        <thead class="bg-danger text-white">
+                        <thead class="bg-light text-muted">
                             <tr>
-                                <th class="ps-3">Nama Barang</th>
-                                <th>Jenis</th>
+                                <th class="ps-3">Barang</th>
                                 <th class="text-center pe-3">Sisa</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach($stok_menipis_list as $brg): ?>
                             <tr>
-                                <td class="ps-3 fw-bold"><?= htmlspecialchars($brg['nama']) ?></td>
-                                <td>
-                                    <?php if($brg['jenis'] == 'Titipan'): ?>
-                                        <span class="badge bg-warning text-dark bg-opacity-25">Titipan</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-success text-success bg-opacity-10">Koperasi</span>
-                                    <?php endif; ?>
+                                <td class="ps-3">
+                                    <span class="fw-bold d-block text-dark"><?= htmlspecialchars($brg['nama']) ?></span>
+                                    <span class="text-muted" style="font-size: 0.75rem;"><?= $brg['jenis'] ?></span>
                                 </td>
                                 <td class="text-center pe-3">
                                     <?php if($brg['sisa'] <= 0): ?>
@@ -190,16 +196,15 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas
                     </table>
                 </div>
                 <?php else: ?>
-                    <div class="text-center py-5 text-muted">
-                        <i class="fas fa-check-circle fa-3x mb-3 text-success opacity-50"></i>
-                        <p class="mb-0">Semua Stok Aman.</p>
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-check-circle fa-3x mb-2 text-success opacity-50"></i>
+                        <p class="mb-0 small">Stok aman.</p>
                     </div>
                 <?php endif; ?>
             </div>
-            <div class="card-footer bg-white text-center">
-                <div class="btn-group w-100 shadow-sm">
-                    <a href="inventory/stok_koperasi" class="btn btn-sm btn-outline-success">Stok Koperasi</a>
-                    <a href="titipan/titipan" class="btn btn-sm btn-outline-warning">Cek Titipan</a>
+            <div class="card-footer bg-white text-center p-3">
+                <div class="d-grid gap-2">
+                    <a href="inventory/stok_koperasi" class="btn btn-outline-dark btn-sm rounded-pill fw-bold">Cek Gudang</a>
                 </div>
             </div>
         </div>

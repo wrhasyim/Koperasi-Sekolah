@@ -1,23 +1,20 @@
 <?php
-// Format Rupiah
+// --- FORMATTING ---
 function formatRp($angka){
     return "Rp " . number_format($angka, 0, ',', '.');
 }
 
-// Format Tanggal Indo
 function tglIndo($tanggal){
     $bulan = array (
         1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
     );
     $pecahkan = explode('-', $tanggal);
-    // Validasi agar tidak error jika format salah
     if(count($pecahkan) < 3) return $tanggal;
-    
     return $pecahkan[2] . ' ' . $bulan[ (int)$pecahkan[1] ] . ' ' . $pecahkan[0];
 }
 
-// Cek Login
+// --- AUTHENTICATION ---
 function cekLogin(){
     if(!isset($_SESSION['user'])){
         header("Location: login.php");
@@ -25,7 +22,17 @@ function cekLogin(){
     }
 }
 
-// FUNGSI CEK TUTUP BUKU
+// --- LOG SYSTEM (AUDIT TRAIL) [BARU] ---
+function catatLog($pdo, $user_id, $aksi, $keterangan){
+    try {
+        $stmt = $pdo->prepare("INSERT INTO log_aktivitas (user_id, aksi, keterangan) VALUES (?, ?, ?)");
+        $stmt->execute([$user_id, $aksi, $keterangan]);
+    } catch (Exception $e) {
+        // Silent error agar tidak mengganggu proses utama
+    }
+}
+
+// --- UTILITIES ---
 function cekStatusPeriode($pdo, $tanggal){
     $tgl = explode('-', $tanggal);
     $bulan = (int)$tgl[1];
@@ -35,14 +42,13 @@ function cekStatusPeriode($pdo, $tanggal){
     $stmt->execute([$bulan, $tahun]);
     
     if($stmt->rowCount() > 0){
-        return true; // SUDAH DITUTUP (TERKUNCI)
+        return true; // TERKUNCI
     }
-    return false; // MASIH BUKA
+    return false; // BUKA
 }
 
-// --- [BARU] FUNGSI FLASH MESSAGE (PENGGANTI ALERT) ---
+// --- FLASH MESSAGE ---
 function setFlash($type, $message){
-    // type: success, danger, warning, info
     $_SESSION['flash'] = [
         'type' => $type,
         'message' => $message
@@ -53,9 +59,8 @@ function displayFlash(){
     if(isset($_SESSION['flash'])){
         $type = $_SESSION['flash']['type'];
         $msg  = $_SESSION['flash']['message'];
-        unset($_SESSION['flash']); // Hapus setelah ditampilkan
+        unset($_SESSION['flash']);
         
-        // Icon mapping
         $icon = 'info-circle';
         if($type == 'success') $icon = 'check-circle';
         if($type == 'danger') $icon = 'exclamation-triangle';
