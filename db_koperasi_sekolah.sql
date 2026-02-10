@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 10, 2026 at 09:33 AM
+-- Generation Time: Feb 10, 2026 at 10:46 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -44,10 +44,10 @@ CREATE TABLE `anggota` (
 
 INSERT INTO `anggota` (`id`, `nama_lengkap`, `username`, `password`, `role`, `no_hp`, `status_aktif`, `created_at`) VALUES
 (1, 'Administrator', 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', NULL, 1, '2026-02-09 05:13:00'),
-(2, 'David Staff', 'staff', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', '081234567891', 1, '2026-02-10 08:32:38'),
-(3, 'Bu Guru Ani', 'guru1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'guru', '081234567892', 1, '2026-02-10 08:32:38'),
-(4, 'Pak Budi Santoso', 'guru2', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'guru', '081234567893', 1, '2026-02-10 08:32:38'),
-(5, 'Siti Pengurus', 'pengurus', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'pengurus', '081234567894', 1, '2026-02-10 08:32:38');
+(2, 'David Staff', 'staff', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'staff', '081234567891', 1, '2026-02-10 08:35:29'),
+(3, 'Bu Guru Ani', 'guru1', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'guru', '081234567892', 1, '2026-02-10 08:35:29'),
+(4, 'Pak Budi Santoso', 'guru2', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'guru', '081234567893', 1, '2026-02-10 08:35:29'),
+(5, 'Siti Pengurus', 'pengurus', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'pengurus', '081234567894', 1, '2026-02-10 08:35:29');
 
 -- --------------------------------------------------------
 
@@ -70,6 +70,18 @@ CREATE TABLE `cicilan` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `cicilan`
+--
+
+INSERT INTO `cicilan` (`id`, `nama_siswa`, `kelas`, `kategori_barang`, `nama_barang`, `total_tagihan`, `terbayar`, `sisa`, `status`, `catatan`, `created_at`, `updated_at`) VALUES
+(1, 'Ahmad Dhani', '10 TKJ 1', 'seragam', 'Seragam Batik - Ukuran L', 100000.00, 100000.00, 0.00, 'lunas', 'Lunas Tunai', '2026-02-10 08:35:29', '2026-02-10 08:35:29'),
+(2, 'Mulan Jameela', '10 TKJ 1', 'eskul', 'Kacu Pramuka & Ring', 25000.00, 25000.00, 0.00, 'lunas', 'Lunas Tunai', '2026-02-10 08:35:29', '2026-02-10 08:35:29'),
+(3, 'Al Ghazali', '11 RPL 2', 'seragam', 'Seragam Olahraga - Set L', 150000.00, 50000.00, 100000.00, 'belum', 'DP awal 50rb', '2026-02-05 08:35:29', '2026-02-10 08:35:29'),
+(4, 'El Rumi', '11 RPL 2', 'eskul', 'Baju Silat (Pencak Silat)', 180000.00, 80000.00, 100000.00, 'belum', 'Belum bayar', '2026-02-08 08:35:29', '2026-02-10 09:03:19'),
+(5, 'Dul Jaelani', '12 MM 1', 'seragam', 'Seragam Batik - Ukuran XL', 105000.00, 100000.00, 5000.00, 'belum', 'Kurang 5rb', '2026-01-31 08:35:29', '2026-02-10 08:35:29'),
+(6, 'MUMUN', 'MPLB 10', 'eskul', 'Baju Silat (Pencak Silat)', 180000.00, 10000.00, 170000.00, 'belum', '', '2026-02-10 09:06:12', '2026-02-10 09:06:12');
+
 -- --------------------------------------------------------
 
 --
@@ -83,6 +95,32 @@ CREATE TABLE `log_aktivitas` (
   `keterangan` text NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `pengaturan`
+--
+
+CREATE TABLE `pengaturan` (
+  `kunci` varchar(50) NOT NULL,
+  `nilai` text DEFAULT NULL,
+  `keterangan` varchar(100) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `pengaturan`
+--
+
+INSERT INTO `pengaturan` (`kunci`, `nilai`, `keterangan`) VALUES
+('header_alamat', 'Jl. Pendidikan No. 1, Jakarta Selatan', 'Alamat di Header Cetak'),
+('header_kontak', 'Telp: (021) 1234567 | Email: kopsis@sekolah.sch.id', 'Kontak di Header Cetak'),
+('header_nama', 'KOPERASI TUNAS MUDA', 'Nama Instansi di Header Cetak'),
+('persen_dansos', '10', 'Persentase Dana Sosial (%)'),
+('persen_kas', '65.0', 'Persentase Sisa Kas (%)'),
+('persen_pembina', '5', 'Persentase Honor Pembina (%)'),
+('persen_pengurus', '15', 'Persentase Honor Pengurus (%)'),
+('persen_staff', '5', 'Persentase Honor Staff (%)');
 
 -- --------------------------------------------------------
 
@@ -118,6 +156,18 @@ CREATE TABLE `simpanan` (
   `keterangan` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `simpanan`
+--
+
+INSERT INTO `simpanan` (`id`, `anggota_id`, `tanggal`, `jenis_simpanan`, `jumlah`, `tipe_transaksi`, `keterangan`, `created_at`) VALUES
+(1, 3, '2026-02-10', 'pokok', 50000.00, 'setor', 'Simpanan Pokok Bu Guru Ani', '2026-02-10 08:35:29'),
+(2, 3, '2026-02-10', 'wajib', 10000.00, 'setor', 'Simpanan Wajib Bulan Ini', '2026-02-10 08:35:29'),
+(3, 3, '2026-02-10', 'hari_raya', 100000.00, 'setor', 'Tabungan Lebaran', '2026-02-10 08:35:29'),
+(4, 4, '2026-02-10', 'pokok', 50000.00, 'setor', 'Simpanan Pokok Pak Budi', '2026-02-10 08:35:29'),
+(5, 4, '2026-02-10', 'hari_raya', 200000.00, 'setor', 'Tabungan Lebaran', '2026-02-10 08:35:29'),
+(6, 4, '2026-02-09', 'hari_raya', 50000.00, 'tarik', 'Ambil sebagian', '2026-02-10 08:35:29');
 
 -- --------------------------------------------------------
 
@@ -164,10 +214,10 @@ CREATE TABLE `stok_eskul` (
 --
 
 INSERT INTO `stok_eskul` (`id`, `nama_barang`, `harga_modal`, `harga_jual`, `stok`, `updated_at`) VALUES
-(1, 'Baju Silat (Pencak Silat)', 150000.00, 180000.00, 10, '2026-02-10 08:32:38'),
-(2, 'Kacu Pramuka & Ring', 15000.00, 25000.00, 40, '2026-02-10 08:32:38'),
-(3, 'Seragam PMR', 130000.00, 160000.00, 15, '2026-02-10 08:32:38'),
-(4, 'Kaos Tim Futsal', 75000.00, 95000.00, 20, '2026-02-10 08:32:38');
+(1, 'Baju Silat (Pencak Silat)', 150000.00, 180000.00, 9, '2026-02-10 09:06:12'),
+(2, 'Kacu Pramuka & Ring', 15000.00, 25000.00, 40, '2026-02-10 08:35:29'),
+(3, 'Seragam PMR', 130000.00, 160000.00, 15, '2026-02-10 08:35:29'),
+(4, 'Kaos Tim Futsal', 75000.00, 95000.00, 20, '2026-02-10 08:35:29');
 
 -- --------------------------------------------------------
 
@@ -189,11 +239,11 @@ CREATE TABLE `stok_koperasi` (
 --
 
 INSERT INTO `stok_koperasi` (`id`, `nama_barang`, `harga_modal`, `harga_jual`, `stok`, `updated_at`) VALUES
-(1, 'Pulpen Standard', 2000.00, 3000.00, 50, '2026-02-10 08:32:38'),
-(2, 'Buku Tulis Sinar Dunia 38', 3500.00, 5000.00, 100, '2026-02-10 08:32:38'),
-(3, 'Air Mineral Gelas', 500.00, 1000.00, 48, '2026-02-10 08:32:38'),
-(4, 'Keripik Singkong Pedas', 4000.00, 5000.00, 20, '2026-02-10 08:32:38'),
-(5, 'Pensil 2B Faber Castell', 3000.00, 4500.00, 30, '2026-02-10 08:32:38');
+(1, 'Pulpen Standard', 2000.00, 3000.00, 50, '2026-02-10 08:35:29'),
+(2, 'Buku Tulis Sinar Dunia 38', 3500.00, 5000.00, 100, '2026-02-10 08:35:29'),
+(3, 'Air Mineral Gelas', 500.00, 1000.00, 48, '2026-02-10 08:35:29'),
+(4, 'Keripik Singkong Pedas', 4000.00, 5000.00, 20, '2026-02-10 08:35:29'),
+(5, 'Pensil 2B Faber Castell', 3000.00, 4500.00, 30, '2026-02-10 08:35:29');
 
 -- --------------------------------------------------------
 
@@ -215,11 +265,11 @@ CREATE TABLE `stok_sekolah` (
 --
 
 INSERT INTO `stok_sekolah` (`id`, `nama_barang`, `harga_modal`, `harga_jual`, `stok`, `updated_at`) VALUES
-(1, 'Seragam Batik - Ukuran L', 85000.00, 100000.00, 25, '2026-02-10 08:32:38'),
-(2, 'Seragam Batik - Ukuran XL', 90000.00, 105000.00, 20, '2026-02-10 08:32:38'),
-(3, 'Seragam Olahraga - Set L', 120000.00, 150000.00, 30, '2026-02-10 08:32:38'),
-(4, 'Topi Sekolah Logo Bordir', 15000.00, 25000.00, 50, '2026-02-10 08:32:38'),
-(5, 'Dasi Sekolah', 10000.00, 15000.00, 50, '2026-02-10 08:32:38');
+(1, 'Seragam Batik - Ukuran L', 85000.00, 100000.00, 25, '2026-02-10 08:35:29'),
+(2, 'Seragam Batik - Ukuran XL', 90000.00, 105000.00, 20, '2026-02-10 08:35:29'),
+(3, 'Seragam Olahraga - Set L', 120000.00, 150000.00, 30, '2026-02-10 08:35:29'),
+(4, 'Topi Sekolah Logo Bordir', 15000.00, 25000.00, 50, '2026-02-10 08:35:29'),
+(5, 'Dasi Sekolah', 10000.00, 15000.00, 50, '2026-02-10 08:35:29');
 
 -- --------------------------------------------------------
 
@@ -245,8 +295,8 @@ CREATE TABLE `titipan` (
 --
 
 INSERT INTO `titipan` (`id`, `anggota_id`, `nama_barang`, `tanggal_titip`, `stok_awal`, `stok_terjual`, `harga_modal`, `harga_jual`, `status_bayar`, `created_at`) VALUES
-(1, 3, 'Donat Kentang Bu Ani', '2026-02-10', 20, 5, 2500.00, 3500.00, 'belum', '2026-02-10 08:32:38'),
-(2, 4, 'Nasi Uduk Pak Budi', '2026-02-10', 15, 15, 6000.00, 8000.00, 'belum', '2026-02-10 08:32:38');
+(1, 3, 'Donat Kentang Bu Ani', '2026-02-10', 15, 15, 2500.00, 3500.00, 'belum', '2026-02-10 08:35:29'),
+(2, 4, 'Nasi Uduk Pak Budi', '2026-02-10', 0, 0, 6000.00, 8000.00, 'belum', '2026-02-10 08:35:29');
 
 -- --------------------------------------------------------
 
@@ -264,6 +314,27 @@ CREATE TABLE `transaksi_kas` (
   `user_id` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `transaksi_kas`
+--
+
+INSERT INTO `transaksi_kas` (`id`, `tanggal`, `kategori`, `arus`, `jumlah`, `keterangan`, `user_id`, `created_at`) VALUES
+(1, '2026-02-10', 'modal_awal', 'masuk', 5000000.00, 'Modal Awal Koperasi', 1, '2026-02-10 08:35:29'),
+(2, '2026-02-10', 'penjualan_seragam', 'masuk', 100000.00, 'Terima (tunai): Seragam Batik - Ahmad Dhani', 1, '2026-02-10 08:35:29'),
+(3, '2026-02-10', 'penjualan_eskul', 'masuk', 25000.00, 'Terima (tunai): Kacu Pramuka - Mulan Jameela', 1, '2026-02-10 08:35:29'),
+(4, '2026-02-05', 'penjualan_seragam', 'masuk', 50000.00, 'Cicilan Al Ghazali: Seragam Olahraga', 1, '2026-02-10 08:35:29'),
+(5, '2026-01-31', 'penjualan_seragam', 'masuk', 100000.00, 'Cicilan Dul Jaelani: Seragam Batik', 1, '2026-02-10 08:35:29'),
+(6, '2026-02-10', 'penjualan_harian', 'masuk', 45000.00, 'Omzet Jajan Istirahat 1', 2, '2026-02-10 08:35:29'),
+(7, '2026-02-09', 'biaya_operasional', 'keluar', 15000.00, 'Beli Galon Air', 2, '2026-02-10 08:35:29'),
+(8, '2026-02-10', 'pembayaran_titipan', 'keluar', 12500.00, 'Setor Titipan: Donat Kentang Bu Ani (5 pcs) - Bu Guru Ani [Laba: 5000]', 1, '2026-02-10 08:37:13'),
+(9, '2026-02-10', 'pembayaran_titipan', 'keluar', 90000.00, 'Setor Titipan: Nasi Uduk Pak Budi (15 pcs) - Pak Budi Santoso [Laba: 30000]', 1, '2026-02-10 08:37:14'),
+(10, '2026-02-10', 'penjualan_eskul', 'masuk', 20000.00, 'Cicilan El Rumi (11 RPL 2): Baju Silat (Pencak Silat) - 1', 1, '2026-02-10 09:02:34'),
+(11, '2026-02-10', 'penjualan_eskul', 'masuk', 60000.00, 'Cicilan El Rumi (11 RPL 2): Baju Silat (Pencak Silat) - 2', 1, '2026-02-10 09:03:19'),
+(12, '2026-02-10', 'penjualan_eskul', 'masuk', 10000.00, 'Terima (CICILAN (HUTANG)): Baju Silat (Pencak Silat) - MUMUN (MPLB 10)', 1, '2026-02-10 09:06:12'),
+(13, '2026-02-10', 'qris_masuk', 'masuk', 150.00, 'p', 1, '2026-02-10 09:09:22'),
+(14, '2026-02-10', 'bagi_hasil_pengurus', 'keluar', 739147.50, 'Pembayaran Honor/Jatah Pengurus (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:32:04'),
+(15, '2026-02-10', 'bagi_hasil_staff', 'keluar', 246382.50, 'Pembayaran Honor/Jatah Staff (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:34:43');
 
 -- --------------------------------------------------------
 
@@ -305,6 +376,12 @@ ALTER TABLE `cicilan`
 --
 ALTER TABLE `log_aktivitas`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `pengaturan`
+--
+ALTER TABLE `pengaturan`
+  ADD PRIMARY KEY (`kunci`);
 
 --
 -- Indexes for table `riwayat_pengambilan`
@@ -371,13 +448,13 @@ ALTER TABLE `tutup_buku`
 -- AUTO_INCREMENT for table `anggota`
 --
 ALTER TABLE `anggota`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `cicilan`
 --
 ALTER TABLE `cicilan`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `log_aktivitas`
@@ -395,7 +472,7 @@ ALTER TABLE `riwayat_pengambilan`
 -- AUTO_INCREMENT for table `simpanan`
 --
 ALTER TABLE `simpanan`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `stok_barang`
@@ -431,7 +508,7 @@ ALTER TABLE `titipan`
 -- AUTO_INCREMENT for table `transaksi_kas`
 --
 ALTER TABLE `transaksi_kas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `tutup_buku`

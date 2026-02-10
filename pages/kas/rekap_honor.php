@@ -1,21 +1,16 @@
 <?php
 // pages/kas/rekap_honor.php
 
-// === FILTER 1: UNTUK HITUNG SURPLUS & POTENSI (BAGIAN ATAS) ===
+// 1. SETUP FILTER (SATU FILTER UNTUK SEMUA)
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 $filter_jenis = isset($_GET['filter_jenis']) ? $_GET['filter_jenis'] : 'all';
 
-// === FILTER 2: UNTUK RIWAYAT PEMBAYARAN (BAGIAN BAWAH) ===
-// Default Histori: Dari awal tahun sampai hari ini (Agar terlihat "Selama ini")
-$hist_awal = isset($_GET['hist_awal']) ? $_GET['hist_awal'] : date('Y-01-01');
-$hist_akhir = isset($_GET['hist_akhir']) ? $_GET['hist_akhir'] : date('Y-m-d');
-$hist_jenis = isset($_GET['hist_jenis']) ? $_GET['hist_jenis'] : 'all';
-
-// AMBIL PENGATURAN
+// 2. AMBIL PENGATURAN
 $set = getAllPengaturan($pdo);
 
-// --- LOGIKA 1: HITUNG SURPLUS ---
+// --- LOGIKA 1: HITUNG SURPLUS (POTENSI) ---
+// Surplus dihitung dari pendapatan operasional murni (mengecualikan pembayaran honor itu sendiri)
 $sql = "SELECT * FROM transaksi_kas 
         WHERE (tanggal BETWEEN ? AND ?) 
         AND kategori NOT IN (
@@ -23,18 +18,24 @@ $sql = "SELECT * FROM transaksi_kas
             'bagi_hasil_staff', 'bagi_hasil_pengurus', 'bagi_hasil_pembina', 'bagi_hasil_dansos'
         ) 
         ORDER BY tanggal ASC";
+
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$tgl_awal, $tgl_akhir]);
 $transaksi = $stmt->fetchAll();
 
-$total_masuk = 0; $total_keluar = 0;
+$total_masuk = 0; 
+$total_keluar = 0;
+
 foreach($transaksi as $t){
-    if($t['arus'] == 'masuk') $total_masuk += $t['jumlah']; else $total_keluar += $t['jumlah'];
+    if($t['arus'] == 'masuk') $total_masuk += $t['jumlah'];
+    else $total_keluar += $t['jumlah'];
 }
+
 $surplus = $total_masuk - $total_keluar;
 
-// HITUNG ALOKASI
+// --- LOGIKA 2: HITUNG ALOKASI DINAMIS ---
 $alloc = ['staff'=>0, 'pengurus'=>0, 'pembina'=>0, 'dansos'=>0];
+
 if($surplus > 0){
     $alloc['staff']    = $surplus * ($set['persen_staff'] / 100);
     $alloc['pengurus'] = $surplus * ($set['persen_pengurus'] / 100);
@@ -42,7 +43,7 @@ if($surplus > 0){
     $alloc['dansos']   = $surplus * ($set['persen_dansos'] / 100);
 }
 
-// CEK STATUS BAYAR (PERIODE SURPLUS)
+// --- LOGIKA 3: CEK STATUS BAYAR (UNTUK TOMBOL) ---
 $status_bayar = [];
 $list_tipe = ['staff', 'pengurus', 'pembina', 'dansos'];
 foreach($list_tipe as $tipe){
@@ -53,15 +54,19 @@ foreach($list_tipe as $tipe){
     $status_bayar[$tipe] = ($cek->rowCount() > 0); 
 }
 
-// --- LOGIKA 2: QUERY RIWAYAT PEMBAYARAN (FILTER BAWAH) ---
+// --- LOGIKA 4: QUERY RIWAYAT PEMBAYARAN (REALISASI) ---
+// Menggunakan Filter yang SAMA dengan Filter Atas
 $sql_history = "SELECT * FROM transaksi_kas 
-                WHERE kategori IN ('bagi_hasil_staff', 'bagi_hasil_pengurus', 'bagi_hasil_pembina', 'bagi_hasil_dansos')
-                AND (tanggal BETWEEN ? AND ?)";
-$params_hist = [$hist_awal, $hist_akhir];
+                WHERE (tanggal BETWEEN ? AND ?) ";
+$params_hist = [$tgl_awal, $tgl_akhir];
 
-if($hist_jenis != 'all'){
+if($filter_jenis == 'all'){
+    // Jika All, ambil semua kategori honor
+    $sql_history .= " AND kategori IN ('bagi_hasil_staff', 'bagi_hasil_pengurus', 'bagi_hasil_pembina', 'bagi_hasil_dansos')";
+} else {
+    // Jika spesifik, ambil kategori itu saja
     $sql_history .= " AND kategori = ?";
-    $params_hist[] = "bagi_hasil_" . $hist_jenis;
+    $params_hist[] = "bagi_hasil_" . $filter_jenis;
 }
 
 $sql_history .= " ORDER BY tanggal DESC, id DESC";
@@ -76,8 +81,9 @@ $history_honor = $stmt_hist->fetchAll();
     .bg-gradient-primary { background: linear-gradient(45deg, #4e73df, #224abe); }
     .btn-action { border-radius: 50px; font-weight: bold; font-size: 0.8rem; padding: 8px 15px; transition: 0.2s; width: 100%; display: block; margin-top: 5px;}
     .btn-action:hover { transform: scale(1.02); }
-    .table-custom th { background: #f8f9fc; color: #858796; font-size: 0.8rem; text-transform: uppercase; padding: 12px; }
-    .table-custom td { padding: 12px; vertical-align: middle; color: #5a5c69; }
+    
+    .table-custom th { background: #f8f9fc; color: #858796; font-size: 0.8rem; text-transform: uppercase; padding: 15px; border-bottom: 2px solid #e3e6f0; }
+    .table-custom td { padding: 15px; vertical-align: middle; color: #5a5c69; border-bottom: 1px solid #f0f0f0; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -90,32 +96,33 @@ $history_honor = $stmt_hist->fetchAll();
     </a>
 </div>
 
-<div class="card border-0 shadow-sm mb-4 rounded-4 bg-light">
-    <div class="card-body p-3">
-        <form class="row g-2 align-items-center" method="GET">
-            <div class="col-auto fw-bold text-primary small text-uppercase"><i class="fas fa-calculator me-2"></i>Periode Hitung Surplus:</div>
-            
+<div class="card border-0 shadow-sm mb-4 rounded-4 bg-white border-start border-5 border-primary">
+    <div class="card-body p-4">
+        <form class="row g-3 align-items-end" method="GET">
             <input type="hidden" name="page" value="kas/rekap_honor">
-            <input type="hidden" name="hist_awal" value="<?= $hist_awal ?>">
-            <input type="hidden" name="hist_akhir" value="<?= $hist_akhir ?>">
-            <input type="hidden" name="hist_jenis" value="<?= $hist_jenis ?>">
-
-            <div class="col-auto"><input type="date" name="tgl_awal" class="form-control form-control-sm border-0 bg-white shadow-sm fw-bold" value="<?= $tgl_awal ?>"></div>
-            <div class="col-auto">-</div>
-            <div class="col-auto"><input type="date" name="tgl_akhir" class="form-control form-control-sm border-0 bg-white shadow-sm fw-bold" value="<?= $tgl_akhir ?>"></div>
             
-            <div class="col-auto ms-3 fw-bold text-muted small text-uppercase">Filter Kartu:</div>
-            <div class="col-auto">
-                <select name="filter_jenis" class="form-select form-select-sm border-0 bg-white shadow-sm fw-bold">
-                    <option value="all" <?= $filter_jenis=='all'?'selected':'' ?>>Semua</option>
-                    <option value="staff" <?= $filter_jenis=='staff'?'selected':'' ?>>Staff</option>
-                    <option value="pengurus" <?= $filter_jenis=='pengurus'?'selected':'' ?>>Pengurus</option>
-                    <option value="pembina" <?= $filter_jenis=='pembina'?'selected':'' ?>>Pembina</option>
-                    <option value="dansos" <?= $filter_jenis=='dansos'?'selected':'' ?>>Dansos</option>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase">Dari Tanggal</label>
+                <input type="date" name="tgl_awal" class="form-control fw-bold" value="<?= $tgl_awal ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase">Sampai Tanggal</label>
+                <input type="date" name="tgl_akhir" class="form-control fw-bold" value="<?= $tgl_akhir ?>">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted text-uppercase">Jenis Honor / Dana</label>
+                <select name="filter_jenis" class="form-select fw-bold">
+                    <option value="all" <?= $filter_jenis=='all'?'selected':'' ?>>Semua Jenis</option>
+                    <option value="staff" <?= $filter_jenis=='staff'?'selected':'' ?>>Honor Staff</option>
+                    <option value="pengurus" <?= $filter_jenis=='pengurus'?'selected':'' ?>>Honor Pengurus</option>
+                    <option value="pembina" <?= $filter_jenis=='pembina'?'selected':'' ?>>Honor Pembina</option>
+                    <option value="dansos" <?= $filter_jenis=='dansos'?'selected':'' ?>>Dana Sosial</option>
                 </select>
             </div>
-            <div class="col-auto ms-2">
-                <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm">Hitung</button>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">
+                    <i class="fas fa-filter me-2"></i> Tampilkan Data
+                </button>
             </div>
         </form>
     </div>
@@ -125,22 +132,25 @@ $history_honor = $stmt_hist->fetchAll();
     <div class="card-body p-4">
         <div class="row align-items-center">
             <div class="col-md-8">
-                <h5 class="text-white-50 text-uppercase small fw-bold mb-1">Total Surplus (SHU Sementara)</h5>
+                <h5 class="text-white-50 text-uppercase small fw-bold mb-1">Surplus Operasional (Potensi)</h5>
                 <h2 class="mb-0 fw-bold"><?= formatRp($surplus) ?></h2>
-                <small class="text-white-50">Periode: <?= date('d M Y', strtotime($tgl_awal)) ?> s/d <?= date('d M Y', strtotime($tgl_akhir)) ?></small>
+                <small class="text-white-50">Menjadi dasar perhitungan alokasi honor di bawah ini.</small>
             </div>
-            <div class="col-md-4 text-end"><i class="fas fa-wallet fa-4x opacity-25"></i></div>
+            <div class="col-md-4 text-end">
+                <i class="fas fa-chart-pie fa-4x opacity-25"></i>
+            </div>
         </div>
     </div>
 </div>
 
 <?php if($surplus <= 0): ?>
-    <div class="alert alert-warning border-0 shadow-sm rounded-3">
+    <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-5">
         <i class="fas fa-exclamation-triangle me-2"></i> 
-        <strong>Tidak ada surplus!</strong> Pengeluaran operasional melebihi pemasukan.
+        <strong>Tidak ada surplus!</strong> Pengeluaran operasional melebihi pemasukan pada periode yang dipilih.
     </div>
 <?php else: ?>
     <div class="row g-4 mb-5">
+        
         <?php if($filter_jenis == 'all' || $filter_jenis == 'staff'): ?>
         <div class="col-md-6">
             <div class="card card-modern h-100 border-start border-5 border-primary">
@@ -154,7 +164,7 @@ $history_honor = $stmt_hist->fetchAll();
                         <div class="col-6"><a href="pages/kas/cetak_honor.php?tipe=staff&tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" target="_blank" class="btn btn-outline-primary btn-action shadow-sm"><i class="fas fa-print me-2"></i> Cetak</a></div>
                         <div class="col-6">
                             <?php if($status_bayar['staff']): ?>
-                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Lunas</button>
+                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Sudah Dibayar</button>
                             <?php else: ?>
                                 <form action="process/kas_bayar_honor.php" method="POST" onsubmit="return confirm('Bayar Honor Staff?')">
                                     <input type="hidden" name="tipe" value="staff">
@@ -184,7 +194,7 @@ $history_honor = $stmt_hist->fetchAll();
                         <div class="col-6"><a href="pages/kas/cetak_honor.php?tipe=pengurus&tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" target="_blank" class="btn btn-outline-success btn-action shadow-sm"><i class="fas fa-print me-2"></i> Cetak</a></div>
                         <div class="col-6">
                             <?php if($status_bayar['pengurus']): ?>
-                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Lunas</button>
+                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Sudah Dibayar</button>
                             <?php else: ?>
                                 <form action="process/kas_bayar_honor.php" method="POST" onsubmit="return confirm('Bayar Honor Pengurus?')">
                                     <input type="hidden" name="tipe" value="pengurus">
@@ -214,7 +224,7 @@ $history_honor = $stmt_hist->fetchAll();
                         <div class="col-6"><a href="pages/kas/cetak_honor.php?tipe=pembina&tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" target="_blank" class="btn btn-outline-warning text-dark btn-action shadow-sm"><i class="fas fa-print me-2"></i> Cetak</a></div>
                         <div class="col-6">
                             <?php if($status_bayar['pembina']): ?>
-                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Lunas</button>
+                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Sudah Dibayar</button>
                             <?php else: ?>
                                 <form action="process/kas_bayar_honor.php" method="POST" onsubmit="return confirm('Bayar Honor Pembina?')">
                                     <input type="hidden" name="tipe" value="pembina">
@@ -244,7 +254,7 @@ $history_honor = $stmt_hist->fetchAll();
                         <div class="col-6"><a href="pages/kas/cetak_honor.php?tipe=dansos&tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" target="_blank" class="btn btn-outline-danger btn-action shadow-sm"><i class="fas fa-print me-2"></i> Cetak</a></div>
                         <div class="col-6">
                             <?php if($status_bayar['dansos']): ?>
-                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Lunas</button>
+                                <button class="btn btn-light text-success fw-bold btn-action shadow-sm border" disabled><i class="fas fa-check-circle me-1"></i> Sudah Dibayar</button>
                             <?php else: ?>
                                 <form action="process/kas_bayar_honor.php" method="POST" onsubmit="return confirm('Cairkan Dana Sosial?')">
                                     <input type="hidden" name="tipe" value="dansos">
@@ -263,37 +273,14 @@ $history_honor = $stmt_hist->fetchAll();
     </div>
 <?php endif; ?>
 
-<hr class="my-5 border-2">
-
 <div class="card border-0 shadow-sm rounded-4">
     <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-        <h6 class="fw-bold text-dark mb-0"><i class="fas fa-history me-2"></i> Riwayat Pembayaran Honor (Realisasi)</h6>
+        <h6 class="fw-bold text-dark mb-0"><i class="fas fa-history me-2"></i> Riwayat Pembayaran (Sesuai Filter Diatas)</h6>
         
-        <form class="d-flex gap-2 align-items-center" method="GET">
-            <input type="hidden" name="page" value="kas/rekap_honor">
-            <input type="hidden" name="tgl_awal" value="<?= $tgl_awal ?>">
-            <input type="hidden" name="tgl_akhir" value="<?= $tgl_akhir ?>">
-            <input type="hidden" name="filter_jenis" value="<?= $filter_jenis ?>">
-            
-            <select name="hist_jenis" class="form-select form-select-sm border-secondary shadow-none" style="width: 130px;">
-                <option value="all" <?= $hist_jenis=='all'?'selected':'' ?>>Semua Tipe</option>
-                <option value="staff" <?= $hist_jenis=='staff'?'selected':'' ?>>Staff</option>
-                <option value="pengurus" <?= $hist_jenis=='pengurus'?'selected':'' ?>>Pengurus</option>
-                <option value="pembina" <?= $hist_jenis=='pembina'?'selected':'' ?>>Pembina</option>
-                <option value="dansos" <?= $hist_jenis=='dansos'?'selected':'' ?>>Dansos</option>
-            </select>
-            
-            <input type="date" name="hist_awal" class="form-control form-control-sm border-secondary shadow-none" value="<?= $hist_awal ?>">
-            <span class="small">-</span>
-            <input type="date" name="hist_akhir" class="form-control form-control-sm border-secondary shadow-none" value="<?= $hist_akhir ?>">
-            
-            <button type="submit" class="btn btn-sm btn-dark"><i class="fas fa-search"></i></button>
-            
-            <a href="process/export_riwayat_honor.php?tgl_awal=<?= $hist_awal ?>&tgl_akhir=<?= $hist_akhir ?>&jenis=<?= $hist_jenis ?>" 
-               target="_blank" class="btn btn-sm btn-success fw-bold">
-                <i class="fas fa-file-excel"></i> Export
-            </a>
-        </form>
+        <a href="process/export_riwayat_honor.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&jenis=<?= $filter_jenis ?>" 
+           target="_blank" class="btn btn-sm btn-success rounded-pill px-3 fw-bold">
+            <i class="fas fa-file-excel me-2"></i> Export Excel
+        </a>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -302,7 +289,7 @@ $history_honor = $stmt_hist->fetchAll();
                     <tr>
                         <th class="ps-4">Tanggal Bayar</th>
                         <th>Kategori</th>
-                        <th>Keterangan / Periode</th>
+                        <th>Keterangan / Periode Surplus</th>
                         <th class="text-end pe-4">Nominal</th>
                     </tr>
                 </thead>
@@ -310,7 +297,7 @@ $history_honor = $stmt_hist->fetchAll();
                     <?php 
                     $total_riwayat = 0;
                     if(empty($history_honor)): ?>
-                        <tr><td colspan="4" class="text-center py-5 text-muted">Belum ada data pembayaran sesuai filter.</td></tr>
+                        <tr><td colspan="4" class="text-center py-5 text-muted">Belum ada data pembayaran pada rentang waktu & jenis yang dipilih.</td></tr>
                     <?php endif;
 
                     foreach($history_honor as $row): 
@@ -333,8 +320,8 @@ $history_honor = $stmt_hist->fetchAll();
                 </tbody>
                 <tfoot class="bg-light">
                     <tr>
-                        <td colspan="3" class="text-end fw-bold text-uppercase small ls-1 py-3">Total Pembayaran (Filter Ini)</td>
-                        <td class="text-end fw-bold text-dark pe-4 py-3"><?= formatRp($total_riwayat) ?></td>
+                        <td colspan="3" class="text-end fw-bold text-uppercase small ls-1 py-3 text-muted">Total Pembayaran Terpilih</td>
+                        <td class="text-end fw-bold text-primary pe-4 py-3 h5 mb-0"><?= formatRp($total_riwayat) ?></td>
                     </tr>
                 </tfoot>
             </table>

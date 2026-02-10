@@ -60,7 +60,9 @@ function getLabel($kategori){
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-bold { font-weight: bold; }
-        .num-col { mso-number-format:"\#\,\#\#0"; }
+        
+        /* FORMAT ANGKA DENGAN RP */
+        .num-col { mso-number-format:"Rp \#\,\#\#0"; } 
         .date-col { mso-number-format:"Short Date"; }
         .bg-total { background-color: #eaecf4; }
     </style>
@@ -82,14 +84,14 @@ function getLabel($kategori){
                 <th width="150">KATEGORI</th>
                 <th width="350">KETERANGAN</th>
                 <th width="150">ADMIN</th>
-                <th width="120">NOMINAL (Rp)</th>
+                <th width="150">NOMINAL</th>
             </tr>
         </thead>
         <tbody>
             <?php 
             $no = 1; $total = 0;
             if(empty($data)): ?>
-                <tr><td colspan="6" class="text-center" height="30">Tidak ada data.</td></tr>
+                <tr><td colspan="6" class="text-center" height="30">Tidak ada data pembayaran honor pada periode ini.</td></tr>
             <?php endif;
 
             foreach($data as $row): 
@@ -108,7 +110,7 @@ function getLabel($kategori){
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="5" class="text-right text-bold bg-total" height="25">TOTAL</td>
+                <td colspan="5" class="text-right text-bold bg-total" height="25">TOTAL PEMBAYARAN</td>
                 <td class="text-right text-bold bg-total num-col"><?= $total ?></td>
             </tr>
         </tfoot>
