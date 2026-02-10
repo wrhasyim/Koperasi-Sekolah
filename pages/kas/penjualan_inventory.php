@@ -29,13 +29,13 @@ if(isset($_POST['proses_jual'])){
         echo "<script>window.history.back();</script>"; exit;
     }
 
-    // 2. Tentukan Tabel & Kategori Kas
+    // 2. Tentukan Tabel & Kategori Kas (CRITICAL LOGIC)
     if($kategori == 'seragam'){
         $tabel_stok = 'stok_sekolah';
-        $kategori_kas = 'penjualan_seragam';
+        $kategori_kas = 'penjualan_seragam'; // Label Khusus Seragam
     } else {
         $tabel_stok = 'stok_eskul';
-        $kategori_kas = 'penjualan_eskul';
+        $kategori_kas = 'penjualan_eskul';   // Label Khusus Eskul
     }
 
     // 3. Ambil Nama Barang dari Database & Cek Stok
@@ -63,6 +63,7 @@ if(isset($_POST['proses_jual'])){
         $pdo->prepare("UPDATE $tabel_stok SET stok = stok - 1 WHERE id = ?")->execute([$id_barang]);
 
         // B. Masuk Laporan Kas (Uang yang diterima)
+        // Kategori disini SANGAT PENTING agar terpisah dari kas koperasi
         if($uang_bayar > 0){
             $ket_kas = "Terima ($metode): $nama_barang_fixed - $nama_siswa ($kelas)";
             $sql_kas = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) 
@@ -71,6 +72,7 @@ if(isset($_POST['proses_jual'])){
         }
 
         // C. Simpan ke History / Cicilan
+        // Kategori barang juga disimpan ('seragam'/'eskul') untuk filter Laporan Distribusi
         $sisa = $total_tagihan - $uang_bayar;
         $status_akhir = ($sisa <= 0) ? 'lunas' : 'belum';
 

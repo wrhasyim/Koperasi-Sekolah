@@ -2,9 +2,8 @@
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
-// --- FILTER KETAT: EXCLUDE SERAGAM & ESKUL ---
-// Kita hanya ambil 'penjualan_harian', 'biaya_operasional', dll.
-// 'penjualan_seragam' dan 'penjualan_eskul' DIBUANG dari query ini.
+// --- FILTER SUPER KETAT: KELUARKAN SERAGAM & ESKUL ---
+// Kita memfilter berdasarkan kolom 'kategori' di tabel transaksi_kas
 $sql = "SELECT * FROM transaksi_kas 
         WHERE (tanggal BETWEEN ? AND ?) 
         AND kategori NOT IN ('penjualan_seragam', 'penjualan_eskul') 
@@ -14,25 +13,22 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([$tgl_awal, $tgl_akhir]);
 $transaksi = $stmt->fetchAll();
 
-// LOGIKA CEK TUTUP BUKU
-$bulan_lalu = date('m', strtotime("-1 month"));
-$tahun_lalu = date('Y', strtotime("-1 month"));
-$cek_tb = $pdo->prepare("SELECT id FROM tutup_buku WHERE bulan = ? AND tahun = ?");
-$cek_tb->execute([$bulan_lalu, $tahun_lalu]);
-$is_closed = $cek_tb->rowCount() > 0;
-$is_admin = ($_SESSION['user']['role'] == 'admin' || $_SESSION['user']['role'] == 'pengurus');
-
-// EXPORT EXCEL (Juga difilter)
+// LOGIKA EXPORT EXCEL
 if(isset($_GET['export_excel'])){
     header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=Laporan_Kas_Koperasi_$tgl_awal.xls");
+    header("Content-Disposition: attachment; filename=Laporan_Arus_Kas_Koperasi_Murni.xls");
     echo "TANGGAL\tKATEGORI\tKETERANGAN\tMASUK\tKELUAR\tSALDO\n";
+    
     $saldo = 0;
     foreach($transaksi as $row){
         $masuk = ($row['arus'] == 'masuk') ? $row['jumlah'] : 0;
         $keluar = ($row['arus'] == 'keluar') ? $row['jumlah'] : 0;
         $saldo += ($masuk - $keluar);
-        echo $row['tanggal'] . "\t" . strtoupper($row['kategori']) . "\t" . $row['keterangan'] . "\t" . $masuk . "\t" . $keluar . "\t" . $saldo . "\n";
+        
+        // Bersihkan nama kategori agar enak dibaca di Excel
+        $kat_clean = strtoupper(str_replace('_', ' ', $row['kategori']));
+        
+        echo $row['tanggal'] . "\t" . $kat_clean . "\t" . $row['keterangan'] . "\t" . $masuk . "\t" . $keluar . "\t" . $saldo . "\n";
     }
     exit;
 }
@@ -42,7 +38,7 @@ if(isset($_GET['export_excel'])){
     <div>
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Keuangan Utama</h6>
         <h2 class="h3 fw-bold mb-0">Laporan Arus Kas Koperasi</h2>
-        <small class="text-danger fw-bold"><i class="fas fa-info-circle me-1"></i> Tidak termasuk uang Seragam & Eskul</small>
+        <small class="text-danger fw-bold"><i class="fas fa-check-circle me-1"></i> Data Murni (Tanpa Uang Seragam/Eskul)</small>
     </div>
 </div>
 
@@ -58,6 +54,7 @@ if(isset($_GET['export_excel'])){
                 <input type="date" name="tgl_akhir" class="form-control border-0 shadow-sm" value="<?= $tgl_akhir ?>">
             </div>
             <button type="submit" class="btn btn-sm btn-primary shadow-sm px-3">Tampilkan</button>
+            
             <div class="ms-auto">
                 <a href="kas/laporan_kas?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>&export_excel=true" class="btn btn-sm btn-success shadow-sm">
                     <i class="fas fa-file-excel me-1"></i> Excel
@@ -88,7 +85,7 @@ if(isset($_GET['export_excel'])){
                     <?php 
                     $saldo = 0; $total_masuk = 0; $total_keluar = 0;
                     if(empty($transaksi)): ?>
-                        <tr><td colspan="6" class="text-center py-5 text-muted">Tidak ada transaksi koperasi periode ini.</td></tr>
+                        <tr><td colspan="6" class="text-center py-5 text-muted">Tidak ada transaksi koperasi pada periode ini.</td></tr>
                     <?php endif;
 
                     foreach($transaksi as $row): 
@@ -103,7 +100,7 @@ if(isset($_GET['export_excel'])){
                     <tr>
                         <td class="ps-4 text-muted fw-bold"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
                         <td>
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill fw-normal">
                                 <?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?>
                             </span>
                         </td>

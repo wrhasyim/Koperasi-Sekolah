@@ -9,8 +9,12 @@ if(isset($_POST['bayar_cicilan'])){
     $nama_siswa = $_POST['nama_siswa_hidden'];
     $kelas_siswa= $_POST['kelas_hidden'];
     $kategori   = $_POST['kategori_hidden']; 
+    
     $tanggal    = date('Y-m-d');
     $user_id    = $_SESSION['user']['id'];
+    
+    // MAPPING KATEGORI KAS AGAR TIDAK NYASAR KE KOPERASI
+    // Ini memastikan uang pelunasan hutang tetap masuk ke laporan Distribusi
     $kat_kas    = ($kategori == 'seragam') ? 'penjualan_seragam' : 'penjualan_eskul';
 
     if($bayar > $sisa_lama){
@@ -18,10 +22,13 @@ if(isset($_POST['bayar_cicilan'])){
     } else {
         try {
             $pdo->beginTransaction();
+            
+            // 1. Masuk ke Transaksi Kas (Akan difilter di Laporan Kas agar tidak muncul)
             $ket_transaksi = "Cicilan $nama_siswa ($kelas_siswa): $nama_brg - " . $ket;
             $pdo->prepare("INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, ?, 'masuk', ?, ?, ?)")
                 ->execute([$tanggal, $kat_kas, $bayar, $ket_transaksi, $user_id]);
 
+            // 2. Update Cicilan
             $sisa_baru = $sisa_lama - $bayar;
             $status = ($sisa_baru <= 0) ? 'lunas' : 'belum';
             $pdo->prepare("UPDATE cicilan SET terbayar = terbayar + ?, sisa = ?, status = ?, updated_at = NOW() WHERE id = ?")

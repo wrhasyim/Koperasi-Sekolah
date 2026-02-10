@@ -1,0 +1,81 @@
+-- 1. MATIKAN PENGECEKAN KUNCI ASING & BERSIHKAN DATA
+SET FOREIGN_KEY_CHECKS = 0;
+
+TRUNCATE TABLE stok_koperasi;
+TRUNCATE TABLE stok_sekolah;
+TRUNCATE TABLE stok_eskul;
+TRUNCATE TABLE titipan;
+TRUNCATE TABLE cicilan;
+TRUNCATE TABLE transaksi_kas;
+TRUNCATE TABLE simpanan;
+TRUNCATE TABLE riwayat_pengambilan;
+TRUNCATE TABLE tutup_buku;
+
+-- Hapus user selain admin (ID 1)
+DELETE FROM anggota WHERE id != 1;
+
+-- 2. INSERT USER TAMBAHAN (STAFF & GURU)
+-- Menggunakan INSERT IGNORE dengan ID yang dipaksa (2, 3, 4)
+INSERT IGNORE INTO `anggota` (`id`, `nama_lengkap`, `username`, `password`, `role`, `status_aktif`, `no_hp`) VALUES
+(2, 'Budi Santoso (Staff)', 'staff', '$2y$10$fW.1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1', 'staff', 1, '081234567891'),
+(3, 'Pak Guru Matematika', 'guru1', '$2y$10$fW.1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1', 'guru', 1, '081234567892'),
+(4, 'Bu Guru Bahasa', 'guru2', '$2y$10$fW.1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1.R1', 'guru', 1, '081234567893');
+
+-- 3. INSERT STOK KOPERASI
+INSERT INTO `stok_koperasi` (`nama_barang`, `harga_modal`, `harga_jual`, `stok`) VALUES
+('Pulpen Standard', 2000, 3000, 50),
+('Buku Tulis Sinar Dunia 38', 3500, 5000, 100),
+('Air Mineral Gelas', 500, 1000, 48),
+('Keripik Singkong Pedas', 4000, 5000, 20),
+('Pensil 2B Faber Castell', 3000, 4500, 30);
+
+-- 4. INSERT STOK SERAGAM
+INSERT INTO `stok_sekolah` (`nama_barang`, `harga_modal`, `harga_jual`, `stok`) VALUES
+('Seragam Batik - Ukuran L', 85000, 100000, 25),
+('Seragam Batik - Ukuran XL', 90000, 105000, 20),
+('Seragam Olahraga - Set L', 120000, 150000, 30),
+('Topi Sekolah Logo Bordir', 15000, 25000, 50),
+('Dasi Sekolah', 10000, 15000, 50);
+
+-- 5. INSERT STOK ESKUL
+INSERT INTO `stok_eskul` (`nama_barang`, `harga_modal`, `harga_jual`, `stok`) VALUES
+('Baju Silat (Pencak Silat)', 150000, 180000, 10),
+('Kacu Pramuka & Ring', 15000, 25000, 40),
+('Seragam PMR', 130000, 160000, 15),
+('Kaos Tim Futsal', 75000, 95000, 20);
+
+-- 6. INSERT TITIPAN GURU
+INSERT INTO `titipan` (`anggota_id`, `nama_barang`, `harga_modal`, `harga_jual`, `stok_awal`, `stok_terjual`, `tanggal_titip`) VALUES
+(3, 'Donat Kentang Pak Guru', 2500, 3500, 20, 5, CURDATE()),
+(4, 'Nasi Uduk Bu Guru', 6000, 8000, 15, 15, CURDATE());
+
+-- 7. INSERT DATA CICILAN & HISTORY
+INSERT INTO `cicilan` (`nama_siswa`, `kelas`, `kategori_barang`, `nama_barang`, `total_tagihan`, `terbayar`, `sisa`, `status`, `catatan`, `created_at`) VALUES
+('Ahmad Dhani', '10 TKJ 1', 'seragam', 'Seragam Batik - Ukuran L', 100000, 100000, 0, 'lunas', 'Lunas Tunai', NOW()),
+('Mulan Jameela', '10 TKJ 1', 'eskul', 'Kacu Pramuka & Ring', 25000, 25000, 0, 'lunas', 'Lunas Tunai', NOW()),
+('Al Ghazali', '11 RPL 2', 'seragam', 'Seragam Olahraga - Set L', 150000, 50000, 100000, 'belum', 'DP awal 50rb', DATE_SUB(NOW(), INTERVAL 5 DAY)),
+('El Rumi', '11 RPL 2', 'eskul', 'Baju Silat (Pencak Silat)', 180000, 0, 180000, 'belum', 'Belum bayar sama sekali', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('Dul Jaelani', '12 MM 1', 'seragam', 'Seragam Batik - Ukuran XL', 105000, 100000, 5000, 'belum', 'Kurang 5rb lagi', DATE_SUB(NOW(), INTERVAL 10 DAY));
+
+-- 8. INSERT TRANSAKSI KAS
+INSERT INTO `transaksi_kas` (`tanggal`, `kategori`, `arus`, `jumlah`, `keterangan`, `user_id`) VALUES
+(CURDATE(), 'modal_awal', 'masuk', 5000000, 'Modal Awal Koperasi', 1),
+(CURDATE(), 'penjualan_seragam', 'masuk', 100000, 'Terima (tunai): Seragam Batik - Ahmad Dhani (10 TKJ 1)', 1),
+(CURDATE(), 'penjualan_eskul', 'masuk', 25000, 'Terima (tunai): Kacu Pramuka - Mulan Jameela', 1),
+(DATE_SUB(CURDATE(), INTERVAL 5 DAY), 'penjualan_seragam', 'masuk', 50000, 'Cicilan Al Ghazali: Seragam Olahraga', 1),
+(DATE_SUB(CURDATE(), INTERVAL 10 DAY), 'penjualan_seragam', 'masuk', 100000, 'Cicilan Dul Jaelani: Seragam Batik', 1),
+(CURDATE(), 'penjualan_harian', 'masuk', 45000, 'Omzet Jajan Istirahat 1', 2),
+(CURDATE(), 'penjualan_harian', 'masuk', 32000, 'Omzet Jajan Istirahat 2', 2),
+(DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'biaya_operasional', 'keluar', 15000, 'Beli Galon Air', 2),
+(DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'belanja_stok', 'keluar', 500000, 'Kulakan Keripik & ATK', 1);
+
+-- 9. INSERT SIMPANAN ANGGOTA (FIXED: Tanpa user_id)
+INSERT INTO `simpanan` (`anggota_id`, `tanggal`, `jenis_simpanan`, `tipe_transaksi`, `jumlah`, `keterangan`) VALUES
+(3, CURDATE(), 'pokok', 'setor', 50000, 'Simpanan Pokok Guru 1'),
+(3, CURDATE(), 'wajib', 'setor', 10000, 'Simpanan Wajib Bulan Ini'),
+(3, CURDATE(), 'hari_raya', 'setor', 100000, 'Tabungan Lebaran'),
+(4, CURDATE(), 'pokok', 'setor', 50000, 'Simpanan Pokok Guru 2'),
+(4, CURDATE(), 'hari_raya', 'setor', 200000, 'Tabungan Lebaran'),
+(4, DATE_SUB(CURDATE(), INTERVAL 1 DAY), 'hari_raya', 'tarik', 50000, 'Ambil sebagian');
+
+SET FOREIGN_KEY_CHECKS = 1;
