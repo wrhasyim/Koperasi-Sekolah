@@ -9,7 +9,6 @@ $role = $user['role'];
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
 
 // --- 1. LOGIKA BASE URL DINAMIS ---
-// Otomatis deteksi http/https dan nama folder
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
 $path = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
@@ -207,15 +206,14 @@ $base_url = "$protocol://$host$path/";
 
     <div class="container-fluid p-0">
         <?php
+            // [BARU] PANGGIL FLASH MESSAGE DISINI
+            displayFlash();
+
             // --- 2. SECURITY & ROUTING ---
-            
-            // Daftar Halaman yang Diizinkan (Whitelist)
-            // Ini mencegah akses file PHP sembarangan via URL
             $allowed_pages = [
                 'dashboard', 
                 'data_anggota', 
                 'profil',
-                
                 // Modul Kas
                 'kas/penjualan_inventory',
                 'kas/manajemen_cicilan',
@@ -224,29 +222,24 @@ $base_url = "$protocol://$host$path/";
                 'kas/kas_belanja',
                 'kas/laporan_kas',
                 'kas/laporan_distribusi',
-                
                 // Modul Simpanan
                 'simpanan/transaksi_simpanan',
                 'simpanan/laporan_simpanan',
-                
                 // Modul Inventory & Titipan
                 'titipan/titipan',
                 'titipan/laporan_titipan',
                 'inventory/stok_koperasi',
                 'inventory/stok_sekolah',
                 'inventory/stok_eskul',
-                
                 // Modul Utilitas
                 'utilitas/backup',
                 'utilitas/riwayat_tutup_buku',
-                
                 // Logout
                 'logout'
             ];
 
             // Cek apakah halaman diminta ada di whitelist
             if(in_array($page, $allowed_pages)){
-                
                 // Handle Logout Khusus
                 if($page == 'logout'){
                     include 'process/auth_logout.php';
@@ -261,7 +254,6 @@ $base_url = "$protocol://$host$path/";
                 }
 
             } else {
-                // Halaman Tidak Diizinkan / Tidak Ada
                 echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-danger mb-3'><i class='fas fa-ban'></i></div><h3 class='text-danger'>Akses Ditolak</h3><p class='text-muted'>Halaman tidak ditemukan atau Anda tidak memiliki akses.</p><a href='dashboard' class='btn btn-primary mt-3'>Kembali ke Dashboard</a></div></div>";
             }
         ?>

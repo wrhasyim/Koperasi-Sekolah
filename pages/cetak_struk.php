@@ -1,77 +1,102 @@
 <?php
-// File ini tidak menggunakan layout index.php agar bersih saat diprint
 require_once '../config/database.php';
 require_once '../config/functions.php';
 
-session_start();
-if(!isset($_SESSION['user'])) exit;
+// Pastikan ID ada
+if(!isset($_GET['id'])){
+    die("ID Transaksi tidak ditemukan.");
+}
 
 $id = $_GET['id'];
-$stmt = $pdo->prepare("SELECT * FROM transaksi_kas WHERE id = ?");
+// Ambil data dari tabel CICILAN (karena menyimpan detail lengkap transaksi)
+$stmt = $pdo->prepare("SELECT * FROM cicilan WHERE id = ?");
 $stmt->execute([$id]);
-$row = $stmt->fetch();
+$trx = $stmt->fetch();
 
-if(!$row) die("Data tidak ditemukan");
+if(!$trx){
+    die("Data transaksi tidak ditemukan.");
+}
+
+$sekolah = "KOPERASI SEKOLAH"; // Ganti nama sekolah Anda
+$alamat  = "Jl. Pendidikan No. 123";
 ?>
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Cetak Struk #<?= $row['id'] ?></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Struk Pembayaran</title>
     <style>
-        body { font-family: 'Courier New', Courier, monospace; font-size: 14px; max-width: 300px; margin: 0 auto; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-        .header h3 { margin: 0; text-transform: uppercase; }
-        .info { margin-bottom: 15px; }
-        .row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-        .total { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; font-weight: bold; font-size: 16px; margin: 15px 0; }
-        .footer { text-align: center; font-size: 12px; margin-top: 20px; }
-        
+        body { font-family: 'Courier New', monospace; font-size: 12px; max-width: 300px; margin: 0 auto; padding: 10px; background: #fff; color: #000; }
+        .text-center { text-align: center; }
+        .text-end { text-align: right; }
+        .fw-bold { font-weight: bold; }
+        .border-top { border-top: 1px dashed #000; margin: 5px 0; }
+        .border-bottom { border-bottom: 1px dashed #000; margin: 5px 0; }
+        .table { width: 100%; }
+        .table td { vertical-align: top; }
         @media print {
+            @page { margin: 0; }
+            body { margin: 0; padding: 5px; }
             .no-print { display: none; }
         }
     </style>
 </head>
 <body onload="window.print()">
 
-    <div class="header">
-        <h3>KOPERASI SEKOLAH</h3>
-        <p>Jl. Pendidikan No. 1<br>Telp: 0812-3456-7890</p>
+    <div class="text-center">
+        <div class="fw-bold" style="font-size: 14px;"><?= $sekolah ?></div>
+        <div><?= $alamat ?></div>
+        <div class="border-bottom"></div>
+        <div><?= date('d/m/Y H:i', strtotime($trx['created_at'])) ?></div>
     </div>
 
-    <div class="info">
-        <div class="row">
-            <span>No. Transaksi</span>
-            <span>#<?= $row['id'] ?></span>
-        </div>
-        <div class="row">
-            <span>Tanggal</span>
-            <span><?= date('d/m/Y H:i', strtotime($row['created_at'])) ?></span>
-        </div>
-        <div class="row">
-            <span>Kasir</span>
-            <span><?= $_SESSION['user']['nama'] ?></span>
-        </div>
+    <div class="border-bottom"></div>
+
+    <table class="table">
+        <tr>
+            <td>Siswa</td>
+            <td class="text-end fw-bold"><?= $trx['nama_siswa'] ?></td>
+        </tr>
+        <tr>
+            <td>Kelas</td>
+            <td class="text-end"><?= $trx['kelas'] ?></td>
+        </tr>
+    </table>
+
+    <div class="border-bottom"></div>
+
+    <div style="margin-bottom: 5px;">
+        <div class="fw-bold"><?= $trx['nama_barang'] ?></div>
+        <div class="text-end"><?= formatRp($trx['total_tagihan']) ?></div>
     </div>
 
-    <div style="margin-bottom: 10px;">
-        <strong>Keterangan:</strong><br>
-        <?= $row['keterangan'] ?><br>
-        <small>(<?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?>)</small>
+    <div class="border-top"></div>
+
+    <table class="table">
+        <tr>
+            <td>Total Tagihan</td>
+            <td class="text-end"><?= formatRp($trx['total_tagihan']) ?></td>
+        </tr>
+        <tr>
+            <td>Sudah Bayar</td>
+            <td class="text-end"><?= formatRp($trx['terbayar']) ?></td>
+        </tr>
+        <tr class="fw-bold">
+            <td>SISA HUTANG</td>
+            <td class="text-end"><?= formatRp($trx['sisa']) ?></td>
+        </tr>
+    </table>
+
+    <div class="border-bottom"></div>
+
+    <div class="text-center" style="margin-top: 10px;">
+        <div class="fw-bold">STATUS: <?= strtoupper($trx['status']) ?></div>
+        <div style="margin-top: 5px;">Terima Kasih</div>
+        <div style="font-size: 10px; color: #555;">Simpan struk ini sebagai bukti pembayaran yang sah.</div>
     </div>
 
-    <div class="row total">
-        <span>TOTAL</span>
-        <span><?= formatRp($row['jumlah']) ?></span>
-    </div>
-
-    <div class="footer">
-        <p>Terima Kasih atas Kunjungan Anda<br>Barang yang dibeli tidak dapat ditukar</p>
-        <small>Dicetak pada: <?= date('d-m-Y H:i:s') ?></small>
-    </div>
-
-    <button class="no-print" style="width: 100%; padding: 10px; cursor: pointer; margin-top: 20px;" onclick="window.history.back()">Kembali</button>
+    <button onclick="window.print()" class="no-print" style="width: 100%; padding: 10px; margin-top: 20px; cursor: pointer; font-weight: bold; background: #ddd; border: none;">CETAK ULANG</button>
 
 </body>
 </html>

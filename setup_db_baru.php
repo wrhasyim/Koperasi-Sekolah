@@ -1,35 +1,85 @@
 <?php
 require_once 'config/database.php';
 
-// Fungsi helper untuk log
-function logger($msg) {
-    echo "<div style='margin-bottom:5px; padding:10px; background:#f0f0f0; border-left:4px solid #4e73df;'>$msg</div>";
+// Fungsi helper untuk log visual
+function logger($msg, $type = 'success') {
+    $color = ($type == 'success') ? '#1cc88a' : '#e74a3b';
+    echo "<div style='margin-bottom:8px; padding:12px; background:#fff; border-left:5px solid $color; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: monospace;'>$msg</div>";
 }
-
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Database Koperasi</title>
-    <style>body{font-family:sans-serif; max-width:800px; margin:20px auto; padding:20px;}</style>
+    <title>FACTORY RESET KOPERASI</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f8f9fc; color: #333; }
+        h1 { color: #e74a3b; border-bottom: 2px solid #e74a3b; padding-bottom: 10px; }
+        .warning-box { background-color: #ffe5e5; color: #b71c1c; padding: 20px; border-radius: 8px; border: 1px solid #ffcdd2; margin-bottom: 30px; }
+        .btn-reset { background-color: #e74a3b; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; width: 100%; }
+        .btn-reset:hover { background-color: #c0392b; }
+        .btn-back { display: inline-block; margin-top: 20px; text-decoration: none; color: #4e73df; font-weight: bold; }
+    </style>
 </head>
 <body>
-    <h1><span style="color:red;">⚠</span> Reset & Setup Database</h1>
-    <p>Script ini akan <strong>MENGHAPUS SEMUA DATA TRANSAKSI TESTING</strong> (Kas, Cicilan, Titipan) dan membuat ulang struktur tabel agar siap digunakan untuk produksi (Input Manual Siswa).</p>
+
+    <h1><i class="fas fa-radiation"></i> SYSTEM FACTORY RESET</h1>
+
+    <div class="warning-box">
+        <h3>⚠ PERINGATAN KERAS!</h3>
+        <p>Anda akan melakukan <strong>RESET TOTAL</strong> pada sistem. Tindakan ini tidak dapat dibatalkan.</p>
+        <ul>
+            <li>Semua Riwayat Transaksi (Kas, QRIS, Belanja) akan <strong>DIHAPUS</strong>.</li>
+            <li>Semua Data Inventory (Stok Barang, Titipan) akan <strong>DIKOSONGKAN</strong>.</li>
+            <li>Semua Data Tabungan & Cicilan akan <strong>HILANG</strong>.</li>
+            <li>Semua Akun Anggota (Siswa, Guru, Staff) akan <strong>DIHAPUS</strong>.</li>
+            <li><strong>HANYA AKUN 'ADMIN' YANG AKAN DISISAKAN.</strong></li>
+        </ul>
+        <p>Pastikan Anda sudah melakukan <strong>BACKUP</strong> jika data ini penting.</p>
+    </div>
     
-    <form method="POST" onsubmit="return confirm('YAKIN INGIN MERESET DATA? Data transaksi testing akan hilang permanen!');">
-        <button type="submit" name="reset_db" style="padding:15px 30px; background:red; color:white; font-weight:bold; border:none; cursor:pointer; border-radius:5px;">
-            YA, RESET SEMUA DATA SEKARANG
+    <form method="POST" onsubmit="return confirm('APAKAH ANDA YAKIN 100%? SEMUA DATA AKAN HILANG PERMANEN!');">
+        <button type="submit" name="reset_db" class="btn-reset">
+            YA, HAPUS SEMUA DATA & SISAKAN ADMIN
         </button>
     </form>
-    <br><hr><br>
+    
+    <br>
 
 <?php
 if(isset($_POST['reset_db'])){
+    echo "<h3>⏳ Memproses Reset...</h3>";
+    
     try {
-        // 1. Reset Tabel Cicilan (Drop & Create untuk memastikan struktur kolom benar)
+        // Matikan pengecekan foreign key sementara agar truncate berjalan mulus
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+        // --- 1. RESET KEUANGAN ---
+        $pdo->exec("TRUNCATE TABLE transaksi_kas");
+        logger("✅ Tabel 'transaksi_kas' berhasil dikosongkan.");
+
+        $pdo->exec("TRUNCATE TABLE simpanan");
+        logger("✅ Tabel 'simpanan' (Tabungan) berhasil dikosongkan.");
+
+        $pdo->exec("TRUNCATE TABLE tutup_buku");
+        logger("✅ Tabel 'tutup_buku' berhasil dikosongkan.");
+
+        // --- 2. RESET INVENTORY ---
+        $pdo->exec("TRUNCATE TABLE stok_koperasi");
+        logger("✅ Tabel 'stok_koperasi' berhasil dikosongkan.");
+
+        $pdo->exec("TRUNCATE TABLE stok_sekolah");
+        logger("✅ Tabel 'stok_sekolah' berhasil dikosongkan.");
+
+        $pdo->exec("TRUNCATE TABLE stok_eskul");
+        logger("✅ Tabel 'stok_eskul' berhasil dikosongkan.");
+
+        $pdo->exec("TRUNCATE TABLE titipan");
+        logger("✅ Tabel 'titipan' (Konsinyasi Guru) berhasil dikosongkan.");
+
+        // --- 3. RESET STRUKTUR CICILAN (DROP & CREATE) ---
+        // Kita drop untuk memastikan strukturnya benar-benar baru (support input manual)
         $pdo->exec("DROP TABLE IF EXISTS cicilan");
         $sql_cicilan = "CREATE TABLE cicilan (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -46,25 +96,26 @@ if(isset($_POST['reset_db'])){
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )";
         $pdo->exec($sql_cicilan);
-        logger("✅ Tabel 'cicilan' berhasil dibuat ulang (Struktur Baru: Manual Nama & Kelas).");
+        logger("✅ Tabel 'cicilan' berhasil di-reset ulang dengan struktur baru.");
 
-        // 2. Kosongkan Riwayat Kas (Truncate)
-        $pdo->exec("TRUNCATE TABLE transaksi_kas");
-        logger("✅ Tabel 'transaksi_kas' berhasil dikosongkan.");
+        // --- 4. BERSIHKAN ANGGOTA (SISAKAN ADMIN) ---
+        // Hapus semua user yang role-nya BUKAN admin
+        $sql_del_user = "DELETE FROM anggota WHERE role != 'admin'";
+        $stmt_user = $pdo->prepare($sql_del_user);
+        $stmt_user->execute();
+        $count_deleted = $stmt_user->rowCount();
+        
+        logger("✅ Tabel 'anggota' dibersihkan. $count_deleted akun (Siswa/Guru/Staff) dihapus. Admin aman.");
 
-        // 3. Kosongkan Data Tutup Buku
-        $pdo->exec("TRUNCATE TABLE tutup_buku");
-        logger("✅ Tabel 'tutup_buku' berhasil dikosongkan.");
+        // Hidupkan kembali foreign key checks
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 
-        // 4. (Opsional) Reset Stok Titipan jika perlu
-        // $pdo->exec("TRUNCATE TABLE titipan"); 
-        // logger("✅ Tabel 'titipan' dikosongkan.");
-
-        echo "<h2 style='color:green;'>SUKSES! Database bersih dan siap digunakan.</h2>";
-        echo "<a href='index.php' style='display:inline-block; padding:10px 20px; background:#4e73df; color:white; text-decoration:none; border-radius:5px;'>Kembali ke Dashboard</a>";
+        echo "<hr>";
+        echo "<h2 style='color:green;'>🎉 RESET COMPLETE! Sistem Siap Digunakan Dari Nol.</h2>";
+        echo "<a href='index.php' class='btn-back'>&larr; Kembali ke Dashboard</a>";
 
     } catch (PDOException $e) {
-        echo "<h3 style='color:red;'>Error: " . $e->getMessage() . "</h3>";
+        logger("❌ TERJADI ERROR: " . $e->getMessage(), 'error');
     }
 }
 ?>

@@ -19,12 +19,14 @@ if(isset($_POST['proses_jual'])){
 
     // 1. Validasi Input
     if(empty($nama_siswa) || empty($kelas) || empty($id_barang)){
-        echo "<script>alert('Nama Siswa, Kelas, dan Barang Wajib Dipilih!'); window.history.back(); exit;</script>";
+        setFlash('danger', 'Nama Siswa, Kelas, dan Barang Wajib Dipilih!');
+        echo "<script>window.history.back();</script>"; exit;
     }
     
     // Validasi Server Side (Backup jika JS dimatikan)
     if($uang_bayar > $total_tagihan){
-        echo "<script>alert('ERROR: Pembayaran melebihi total tagihan! Transaksi dibatalkan.'); window.history.back(); exit;</script>";
+        setFlash('danger', 'ERROR: Pembayaran melebihi total tagihan! Transaksi dibatalkan.');
+        echo "<script>window.history.back();</script>"; exit;
     }
 
     // 2. Tentukan Tabel & Kategori Kas
@@ -42,19 +44,14 @@ if(isset($_POST['proses_jual'])){
     $item = $stmt->fetch();
 
     if(!$item){
-        echo "<script>alert('Barang tidak ditemukan di database!'); window.history.back(); exit;</script>";
+        setFlash('danger', 'Barang tidak ditemukan di database!');
+        echo "<script>window.history.back();</script>"; exit;
     }
     
     // Cek Stok
     if($item['stok'] < 1){
-         echo "<script>alert('Stok Barang Habis! Silakan restock dulu.'); window.history.back(); exit;</script>";
-    }
-    
-    // Validasi Harga (Anti-Hack: Pastikan harga yang dikirim sama dengan database)
-    if($total_tagihan != $item['harga_jual']){
-         // Opsional: jika ingin ketat, uncomment baris ini. 
-         // Tapi karena form readonly, harusnya aman.
-         // echo "<script>alert('Harga tidak valid!'); window.history.back(); exit;</script>";
+         setFlash('danger', 'Stok Barang Habis! Silakan restock dulu.');
+         echo "<script>window.history.back();</script>"; exit;
     }
 
     $nama_barang_fixed = $item['nama_barang']; 
@@ -80,13 +77,21 @@ if(isset($_POST['proses_jual'])){
         $sql_history = "INSERT INTO cicilan (nama_siswa, kelas, kategori_barang, nama_barang, total_tagihan, terbayar, sisa, status, catatan) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $pdo->prepare($sql_history)->execute([$nama_siswa, $kelas, $kategori, $nama_barang_fixed, $total_tagihan, $uang_bayar, $sisa, $status_akhir, $catatan]);
+        
+        // D. Ambil ID Transaksi Terakhir (Untuk keperluan Cetak Struk)
+        $id_trx = $pdo->lastInsertId();
 
         $pdo->commit();
-        echo "<script>alert('Transaksi Berhasil! Stok Berkurang & Data Tersimpan.'); window.location='kas/penjualan_inventory';</script>";
+        
+        // Tampilkan Flash Message Sukses + Link Cetak Struk
+        setFlash('success', "Transaksi Berhasil Disimpan! <a href='pages/cetak_struk.php?id=$id_trx' target='_blank' class='btn btn-sm btn-light ms-2 text-dark fw-bold text-decoration-underline'><i class='fas fa-print'></i> Cetak Struk</a>");
+        
+        echo "<script>window.location='kas/penjualan_inventory';</script>";
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        echo "<script>alert('Gagal: " . $e->getMessage() . "');</script>";
+        setFlash('danger', 'Gagal: ' . $e->getMessage());
+        echo "<script>window.history.back();</script>";
     }
 }
 

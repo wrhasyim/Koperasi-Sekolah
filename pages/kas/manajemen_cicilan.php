@@ -9,42 +9,38 @@ if(isset($_POST['bayar_cicilan'])){
     $nama_siswa = $_POST['nama_siswa_hidden'];
     $kelas_siswa= $_POST['kelas_hidden'];
     $kategori   = $_POST['kategori_hidden']; 
-    
     $tanggal    = date('Y-m-d');
     $user_id    = $_SESSION['user']['id'];
     $kat_kas    = ($kategori == 'seragam') ? 'penjualan_seragam' : 'penjualan_eskul';
 
     if($bayar > $sisa_lama){
-        echo "<script>alert('Pembayaran melebihi sisa tagihan!');</script>";
+        setFlash('danger', 'Pembayaran melebihi sisa tagihan!');
     } else {
         try {
             $pdo->beginTransaction();
-            // Masuk Kas
             $ket_transaksi = "Cicilan $nama_siswa ($kelas_siswa): $nama_brg - " . $ket;
             $pdo->prepare("INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, ?, 'masuk', ?, ?, ?)")
                 ->execute([$tanggal, $kat_kas, $bayar, $ket_transaksi, $user_id]);
 
-            // Update Cicilan
             $sisa_baru = $sisa_lama - $bayar;
             $status = ($sisa_baru <= 0) ? 'lunas' : 'belum';
             $pdo->prepare("UPDATE cicilan SET terbayar = terbayar + ?, sisa = ?, status = ?, updated_at = NOW() WHERE id = ?")
                 ->execute([$bayar, $sisa_baru, $status, $id_cicilan]);
 
             $pdo->commit();
-            echo "<script>alert('Pembayaran Berhasil!'); window.location='kas/manajemen_cicilan';</script>";
+            // [FLASH MESSAGE + CETAK]
+            setFlash('success', "Pembayaran Berhasil! <a href='pages/cetak_struk.php?id=$id_cicilan' target='_blank' class='btn btn-sm btn-light ms-2 text-dark fw-bold text-decoration-underline'><i class='fas fa-print'></i> Cetak Struk</a>");
+            echo "<script>window.location='kas/manajemen_cicilan';</script>";
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            echo "<script>alert('Error: " . $e->getMessage() . "');</script>";
+            setFlash('danger', 'Error: ' . $e->getMessage());
         }
     }
 }
 
 // --- LOGIKA TAMPILAN (VIEW) ---
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'tagihan'; // 'tagihan' atau 'rekap'
-
-// LIST KELAS UNIK (Untuk Dropdown Filter)
 $list_kelas = $pdo->query("SELECT DISTINCT kelas FROM cicilan ORDER BY kelas ASC")->fetchAll();
-
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -68,7 +64,6 @@ $list_kelas = $pdo->query("SELECT DISTINCT kelas FROM cicilan ORDER BY kelas ASC
 </ul>
 
 <?php if($tab == 'tagihan'): 
-    // Query hanya yang BELUM LUNAS untuk difokuskan ditagih
     $sql_tagihan = "SELECT * FROM cicilan WHERE status = 'belum' ORDER BY created_at DESC";
     $data_tagihan = $pdo->query($sql_tagihan)->fetchAll();
 ?>
@@ -110,6 +105,9 @@ $list_kelas = $pdo->query("SELECT DISTINCT kelas FROM cicilan ORDER BY kelas ASC
                             <button class="btn btn-sm btn-primary shadow-sm rounded-pill px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#modalBayar<?= $row['id'] ?>">
                                 Bayar
                             </button>
+                            <a href="pages/cetak_struk.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-light border rounded-pill px-2 ms-1" title="Cetak Kartu Hutang">
+                                <i class="fas fa-print"></i>
+                            </a>
 
                             <div class="modal fade" id="modalBayar<?= $row['id'] ?>" tabindex="-1">
                                 <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -165,7 +163,6 @@ $list_kelas = $pdo->query("SELECT DISTINCT kelas FROM cicilan ORDER BY kelas ASC
     $sql_rekap .= " ORDER BY kelas ASC, nama_siswa ASC";
     $data_rekap = $pdo->query($sql_rekap)->fetchAll();
 
-    // Hitung Statistik
     $total_siswa = count($data_rekap);
     $total_lunas = 0;
     foreach($data_rekap as $d) { if($d['status'] == 'lunas') $total_lunas++; }
@@ -236,7 +233,6 @@ $list_kelas = $pdo->query("SELECT DISTINCT kelas FROM cicilan ORDER BY kelas ASC
                     <?php endif; 
                     $curr_kelas = '';
                     foreach($data_rekap as $row): 
-                        // Logic Pengelompokan Visual Kelas
                         $show_kelas = ($curr_kelas != $row['kelas']);
                         if($show_kelas) $curr_kelas = $row['kelas'];
                     ?>

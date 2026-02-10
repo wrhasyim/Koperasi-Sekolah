@@ -25,9 +25,7 @@ function cekLogin(){
     }
 }
 
-// FUNGSI BARU: Cek Status Tutup Buku
-// Return TRUE jika periode sudah ditutup (Locked)
-// Return FALSE jika periode masih aman (Open)
+// FUNGSI CEK TUTUP BUKU
 function cekStatusPeriode($pdo, $tanggal){
     $tgl = explode('-', $tanggal);
     $bulan = (int)$tgl[1];
@@ -40,5 +38,37 @@ function cekStatusPeriode($pdo, $tanggal){
         return true; // SUDAH DITUTUP (TERKUNCI)
     }
     return false; // MASIH BUKA
+}
+
+// --- [BARU] FUNGSI FLASH MESSAGE (PENGGANTI ALERT) ---
+function setFlash($type, $message){
+    // type: success, danger, warning, info
+    $_SESSION['flash'] = [
+        'type' => $type,
+        'message' => $message
+    ];
+}
+
+function displayFlash(){
+    if(isset($_SESSION['flash'])){
+        $type = $_SESSION['flash']['type'];
+        $msg  = $_SESSION['flash']['message'];
+        unset($_SESSION['flash']); // Hapus setelah ditampilkan
+        
+        // Icon mapping
+        $icon = 'info-circle';
+        if($type == 'success') $icon = 'check-circle';
+        if($type == 'danger') $icon = 'exclamation-triangle';
+        
+        echo "
+        <div class='alert alert-$type alert-dismissible fade show shadow-sm border-0 mb-4' role='alert'>
+            <div class='d-flex align-items-center'>
+                <i class='fas fa-$icon me-2 fs-5'></i>
+                <div>$msg</div>
+            </div>
+            <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
+        </div>
+        ";
+    }
 }
 ?>
