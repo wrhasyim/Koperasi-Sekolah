@@ -2,8 +2,8 @@
 // pages/guru/laporan_saya.php
 $id_guru = $_SESSION['user']['id'];
 
-// Query Barang Titipan Saya
-$sql = "SELECT * FROM titipan WHERE anggota_id = ? ORDER BY tanggal_masuk DESC";
+// PERBAIKAN: Mengganti 'tanggal_masuk' menjadi 'tanggal_titip'
+$sql = "SELECT * FROM titipan WHERE anggota_id = ? ORDER BY tanggal_titip DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$id_guru]);
 $titipan = $stmt->fetchAll();
@@ -35,19 +35,21 @@ $titipan = $stmt->fetchAll();
                     <?php endif;
 
                     foreach($titipan as $row): 
-                        $pendapatan = $row['terjual'] * $row['harga_beli'];
+                        // PERBAIKAN: Menggunakan nama kolom yang benar sesuai database
+                        $sisa = $row['stok_awal'] - $row['stok_terjual'];
+                        $pendapatan = $row['stok_terjual'] * $row['harga_modal'];
                         $total_cuan += $pendapatan;
                     ?>
                     <tr>
-                        <td class="ps-4"><?= date('d/m/y', strtotime($row['tanggal_masuk'])) ?></td>
+                        <td class="ps-4"><?= date('d/m/y', strtotime($row['tanggal_titip'])) ?></td>
                         <td class="fw-bold"><?= htmlspecialchars($row['nama_barang']) ?></td>
-                        <td class="text-end"><?= formatRp($row['harga_beli']) ?></td>
-                        <td class="text-center"><?= $row['jumlah_awal'] ?></td>
-                        <td class="text-center text-success fw-bold"><?= $row['terjual'] ?></td>
-                        <td class="text-center text-danger"><?= $row['sisa'] ?></td>
+                        <td class="text-end"><?= formatRp($row['harga_modal']) ?></td>
+                        <td class="text-center"><?= $row['stok_awal'] ?></td>
+                        <td class="text-center text-success fw-bold"><?= $row['stok_terjual'] ?></td>
+                        <td class="text-center text-danger"><?= $sisa ?></td>
                         <td class="text-end fw-bold text-primary"><?= formatRp($pendapatan) ?></td>
                         <td class="text-center">
-                            <?php if($row['status'] == 'lunas'): ?>
+                            <?php if($row['status_bayar'] == 'lunas'): ?>
                                 <span class="badge bg-success">SUDAH DIBAYAR</span>
                             <?php else: ?>
                                 <span class="badge bg-warning text-dark">BELUM CAIR</span>

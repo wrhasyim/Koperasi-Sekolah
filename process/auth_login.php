@@ -1,4 +1,5 @@
 <?php
+// process/auth_login.php
 session_start();
 require_once '../config/database.php';
 
@@ -9,7 +10,6 @@ $stmt = $pdo->prepare("SELECT * FROM anggota WHERE username = ?");
 $stmt->execute([$username]);
 $user = $stmt->fetch();
 
-// Cek User & Password Hash
 if($user && password_verify($password, $user['password'])){
     if($user['status_aktif'] == 0){
         $_SESSION['error'] = "Akun dinonaktifkan.";
@@ -17,10 +17,10 @@ if($user && password_verify($password, $user['password'])){
         exit;
     }
 
-    // Set Session
+    // PERBAIKAN: Menggunakan 'nama_lengkap' agar cocok dengan dashboard
     $_SESSION['user'] = [
         'id' => $user['id'],
-        'nama' => $user['nama_lengkap'],
+        'nama_lengkap' => $user['nama_lengkap'], 
         'role' => $user['role']
     ];
     header("Location: ../index.php");

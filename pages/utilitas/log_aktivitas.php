@@ -2,20 +2,18 @@
 // pages/utilitas/log_aktivitas.php
 require_once 'config/database.php';
 
-// Validasi Akses
+// Validasi Akses: Hanya Admin & Pengurus
 if(!in_array($_SESSION['user']['role'], ['admin', 'pengurus'])){
     echo "<script>alert('Akses Ditolak!'); window.location='index.php';</script>";
     exit;
 }
 
-// Filter
+// Filter Tanggal
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-d');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
-// QUERY DIPERBAIKI:
-// Mengambil data log. Nama diambil dari tabel anggota jika ada.
-// Role diambil langsung dari tabel log_aktivitas (kolom 'role') agar aman.
-$sql = "SELECT l.*, a.nama_lengkap 
+// QUERY DIPERBAIKI: Mengambil role dari tabel anggota (a.role)
+$sql = "SELECT l.*, a.nama_lengkap, a.role as role_anggota
         FROM log_aktivitas l 
         LEFT JOIN anggota a ON l.user_id = a.id 
         WHERE DATE(l.created_at) BETWEEN ? AND ? 
@@ -37,7 +35,7 @@ $logs = $stmt->fetchAll();
     <div class="card-body p-3">
         <form method="GET" class="row g-2 align-items-center">
             <input type="hidden" name="page" value="utilitas/log_aktivitas">
-            <div class="col-auto fw-bold text-muted small">FILTER:</div>
+            <div class="col-auto fw-bold text-muted small">FILTER TANGGAL:</div>
             <div class="col-auto"><input type="date" name="tgl_awal" class="form-control form-control-sm" value="<?= $tgl_awal ?>"></div>
             <div class="col-auto">s/d</div>
             <div class="col-auto"><input type="date" name="tgl_akhir" class="form-control form-control-sm" value="<?= $tgl_akhir ?>"></div>
@@ -56,26 +54,27 @@ $logs = $stmt->fetchAll();
                         <th>User (Pelaku)</th>
                         <th>Role</th>
                         <th>Aksi</th>
-                        <th>Keterangan</th>
+                        <th>Keterangan Detail</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if(empty($logs)): ?>
-                        <tr><td colspan="5" class="text-center py-5 text-muted">Tidak ada data.</td></tr>
+                        <tr><td colspan="5" class="text-center py-5 text-muted">Tidak ada aktivitas.</td></tr>
                     <?php endif; 
                     foreach($logs as $row): 
                         $badge = 'secondary';
                         if($row['aksi'] == 'Login') $badge = 'success';
                         if($row['aksi'] == 'Hapus') $badge = 'danger';
-                        
-                        // FIX ERROR UNDEFINED KEY ROLE
-                        // Pastikan kolom role ada, jika tidak pakai default '-'
-                        $role_user = isset($row['role']) ? strtoupper($row['role']) : '-';
+                        if($row['aksi'] == 'Edit') $badge = 'warning text-dark';
+                        if($row['aksi'] == 'Stock Opname') $badge = 'info text-white';
+
+                        // AMBIL ROLE DARI HASIL JOIN
+                        $role_display = $row['role_anggota'] ?: '-';
                     ?>
                     <tr>
                         <td class="ps-4 fw-bold text-muted"><?= date('d/m/Y H:i', strtotime($row['created_at'])) ?></td>
                         <td class="fw-bold text-dark"><?= htmlspecialchars($row['nama_lengkap'] ?: 'System/Unknown') ?></td>
-                        <td><span class="badge bg-light text-dark border"><?= $role_user ?></span></td>
+                        <td><span class="badge bg-light text-dark border"><?= strtoupper($role_display) ?></span></td>
                         <td><span class="badge bg-<?= $badge ?> rounded-pill px-2"><?= strtoupper($row['aksi']) ?></span></td>
                         <td class="text-secondary"><?= htmlspecialchars($row['keterangan']) ?></td>
                     </tr>

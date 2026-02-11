@@ -8,9 +8,8 @@ $simpanan->execute([$id]);
 $total_simpanan = $simpanan->fetchColumn() ?: 0;
 
 // Hitung Titipan (Pendapatan Belum Diambil)
-// Asumsi: Laba Guru = Harga Modal Barang Terjual
-// (Perlu disesuaikan jika logika titipan Anda berbeda)
-$titipan = $pdo->prepare("SELECT SUM(terjual * harga_beli) FROM titipan WHERE anggota_id = ? AND status != 'lunas'");
+// PERBAIKAN: Kolom 'stok_terjual', 'harga_modal', dan 'status_bayar' sesuai database
+$titipan = $pdo->prepare("SELECT SUM(stok_terjual * harga_modal) FROM titipan WHERE anggota_id = ? AND status_bayar != 'lunas'");
 $titipan->execute([$id]);
 $total_titipan = $titipan->fetchColumn() ?: 0;
 
@@ -20,7 +19,7 @@ $hutang->execute([$id]);
 $total_hutang = $hutang->fetchColumn() ?: 0;
 ?>
 
-<h2 class="fw-bold text-dark mb-4">Selamat Datang, <?= htmlspecialchars($_SESSION['user']['nama_lengkap']) ?>!</h2>
+<h2 class="fw-bold text-dark mb-4">Selamat Datang, <?= htmlspecialchars($_SESSION['user']['nama_lengkap'] ?? 'Guru') ?>!</h2>
 
 <div class="row g-4">
     <div class="col-md-4">

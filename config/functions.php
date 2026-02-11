@@ -24,17 +24,17 @@ function cekLogin(){
     }
 }
 
-// --- [UPGRADE] LOG SYSTEM (AUDIT TRAIL) ---
-// Fungsi ini sekarang mencatat IP dan Role juga
+// --- [DIPERBAIKI] LOG SYSTEM (AUDIT TRAIL) ---
+// Fungsi ini sekarang mencatat IP dan Role menggunakan tabel 'anggota'
 function catatLog($pdo, $user_id, $aksi, $keterangan){
     try {
-        // 1. Ambil Role User saat ini
-        $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+        // 1. Ambil Role User dari tabel 'anggota' (Bukan 'users')
+        $stmt = $pdo->prepare("SELECT role FROM anggota WHERE id = ?");
         $stmt->execute([$user_id]);
         $role = $stmt->fetchColumn() ?: 'unknown';
 
         // 2. Ambil IP Address
-        $ip = $_SERVER['REMOTE_ADDR'];
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 
         // 3. Simpan ke Database
         $sql = "INSERT INTO log_aktivitas (user_id, role, aksi, keterangan, ip_address, created_at) 
@@ -43,21 +43,20 @@ function catatLog($pdo, $user_id, $aksi, $keterangan){
         $stmt_insert->execute([$user_id, $role, $aksi, $keterangan, $ip]);
         
     } catch (Exception $e) {
-        // Silent error: Jangan sampai gagal log bikin error transaksi utama
+        // Silent error: Jangan sampai gagal log menghentikan transaksi utama
     }
 }
 
 // --- UTILITIES ---
 function cekStatusPeriode($pdo, $tanggal){
     $tgl = explode('-', $tanggal);
-    $bulan = (int)$tgl[1];
-    $tahun = (int)$tgl[0];
+    $bulan = (int)($tgl[1] ?? 0);
+    $tahun = (int)($tgl[0] ?? 0);
 
     $stmt = $pdo->prepare("SELECT id FROM tutup_buku WHERE bulan = ? AND tahun = ?");
     $stmt->execute([$bulan, $tahun]);
     
-    if($stmt->rowCount() > 0){ return true; }
-    return false;
+    return $stmt->rowCount() > 0;
 }
 
 // --- FLASH MESSAGE ---

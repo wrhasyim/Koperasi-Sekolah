@@ -14,17 +14,16 @@ if (isset($_GET['action']) && $_GET['action'] == 'download_template') {
     $type = $_GET['type'] ?? '';
     header('Content-Type: text/csv; charset=utf-8');
     header('Cache-Control: no-store, no-cache');
-    
+
     if ($type == 'mpls') {
-        header('Content-Disposition: attachment; filename="template_siswa_mpls.csv"');
-        echo "nis,nama,kelas"; // Struktur kolom CSV untuk MPLS
+        header('Content-Disposition: attachment; filename="template_siswa_baru_mpls.csv"');
+        echo "nama_siswa"; // Hanya Nama untuk MPLS
     } else {
         header('Content-Disposition: attachment; filename="template_anggota_eskul.csv"');
-        echo "nama,kelas"; // Struktur kolom CSV untuk Eskul
+        echo "nis,nama_siswa,kelas"; // Lengkap untuk Eskul
     }
     exit;
 }
-
 cekLogin();
 $user = $_SESSION['user'];
 $role = $user['role'];

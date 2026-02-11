@@ -1,6 +1,8 @@
 <?php
 // pages/data_anggota.php
-// PERBAIKAN: Menambahkan filter role != 'admin' agar admin tidak muncul di daftar anggota
+require_once 'config/database.php';
+
+// PERBAIKAN: Menambahkan filter role != 'admin' agar admin tidak muncul di daftar
 $stmt = $pdo->query("SELECT * FROM anggota WHERE role != 'admin' ORDER BY nama_lengkap ASC");
 $anggota = $stmt->fetchAll();
 $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
@@ -16,19 +18,13 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
     </button>
 </div>
 
-<?php if(isset($_SESSION['success'])): ?>
-    <div class="alert alert-success border-0 shadow-sm alert-dismissible fade show mb-4">
-        <i class="fas fa-check-circle me-2"></i> <?= $_SESSION['success']; unset($_SESSION['success']); ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
-
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm rounded-4">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="bg-light">
                 <tr>
                     <th class="ps-4">Nama Anggota</th>
+                    <th>Kontak (WA)</th>
                     <th>Role</th>
                     <th>Status</th>
                     <th class="text-end pe-4">Aksi</th>
@@ -51,24 +47,25 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
                             </div>
                         </div>
                     </td>
+                    <td><?= htmlspecialchars($row['no_hp'] ?: '-') ?></td>
                     <td>
                         <?php 
-                        if($row['role']=='staff') echo '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-3 py-2 rounded-pill">STAFF</span>';
-                        elseif($row['role']=='pengurus') echo '<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-3 py-2 rounded-pill">PENGURUS</span>';
-                        else echo '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-3 py-2 rounded-pill">GURU</span>'; 
+                        if($row['role']=='staff') echo '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-3 py-2 rounded-pill">STAFF</span>';
+                        elseif($row['role']=='pengurus') echo '<span class="badge bg-info bg-opacity-10 text-info border border-info px-3 py-2 rounded-pill">PENGURUS</span>';
+                        else echo '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary px-3 py-2 rounded-pill">GURU</span>'; 
                         ?>
                     </td>
                     <td>
                         <?= $row['status_aktif'] 
-                            ? '<span class="text-success fw-bold"><i class="fas fa-dot-circle small me-1"></i> Aktif</span>' 
+                            ? '<span class="text-success fw-bold"><i class="fas fa-check-circle small me-1"></i> Aktif</span>' 
                             : '<span class="text-muted"><i class="fas fa-ban small me-1"></i> Nonaktif</span>' 
                         ?>
                     </td>
                     <td class="text-end pe-4">
-                        <button class="btn btn-sm btn-light border text-primary shadow-sm rounded-circle" style="width: 32px; height: 32px;" data-bs-toggle="modal" data-bs-target="#modalEdit<?= $row['id'] ?>" title="Edit">
+                        <button class="btn btn-sm btn-light border text-primary shadow-sm rounded-circle" style="width: 32px; height: 32px;" data-bs-toggle="modal" data-bs-target="#modalEdit<?= $row['id'] ?>">
                             <i class="fas fa-pen fa-xs"></i>
                         </button>
-                        <a href="process/anggota_hapus.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-light border text-danger shadow-sm rounded-circle ms-1" style="width: 32px; height: 32px;" onclick="return confirm('Hapus user ini?')" title="Hapus">
+                        <a href="process/anggota_hapus.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-light border text-danger shadow-sm rounded-circle ms-1" style="width: 32px; height: 32px;" onclick="return confirm('Hapus user ini?')">
                             <i class="fas fa-trash fa-xs"></i>
                         </a>
                     </td>
@@ -85,34 +82,37 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
                                 <div class="modal-body">
                                     <input type="hidden" name="id" value="<?= $row['id'] ?>">
                                     <div class="mb-3">
-                                        <label class="small text-muted fw-bold text-uppercase">Nama Lengkap</label>
-                                        <input type="text" name="nama" class="form-control form-control-lg bg-light border-0" value="<?= htmlspecialchars($row['nama_lengkap']) ?>" required>
+                                        <label class="small text-muted fw-bold">NAMA LENGKAP</label>
+                                        <input type="text" name="nama" class="form-control bg-light border-0" value="<?= htmlspecialchars($row['nama_lengkap']) ?>" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="small text-muted fw-bold text-uppercase">Username</label>
-                                        <input type="text" name="username" class="form-control form-control-lg bg-light border-0" value="<?= htmlspecialchars($row['username']) ?>" required>
+                                        <label class="small text-muted fw-bold">USERNAME</label>
+                                        <input type="text" name="username" class="form-control bg-light border-0" value="<?= htmlspecialchars($row['username']) ?>" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="small text-muted fw-bold">NOMOR HP / WA</label>
+                                        <input type="text" name="no_hp" class="form-control bg-light border-0" value="<?= htmlspecialchars($row['no_hp']) ?>" placeholder="0812...">
                                     </div>
                                     <div class="row">
                                         <div class="col-6 mb-3">
-                                            <label class="small text-muted fw-bold text-uppercase">Role</label>
-                                            <select name="role" class="form-select form-select-lg bg-light border-0">
+                                            <label class="small text-muted fw-bold">ROLE</label>
+                                            <select name="role" class="form-select bg-light border-0">
                                                 <option value="guru" <?= $row['role']=='guru'?'selected':'' ?>>Guru</option>
                                                 <option value="staff" <?= $row['role']=='staff'?'selected':'' ?>>Staff</option>
                                                 <option value="pengurus" <?= $row['role']=='pengurus'?'selected':'' ?>>Pengurus</option>
                                             </select>
                                         </div>
                                         <div class="col-6 mb-3">
-                                            <label class="small text-muted fw-bold text-uppercase">Status</label>
-                                            <select name="status_aktif" class="form-select form-select-lg bg-light border-0">
+                                            <label class="small text-muted fw-bold">STATUS</label>
+                                            <select name="status_aktif" class="form-select bg-light border-0">
                                                 <option value="1" <?= $row['status_aktif']==1?'selected':'' ?>>Aktif</option>
                                                 <option value="0" <?= $row['status_aktif']==0?'selected':'' ?>>Blokir</option>
                                             </select>
                                         </div>
                                     </div>
-                                    <hr class="my-4">
                                     <div class="mb-3">
-                                        <label class="small text-muted fw-bold text-uppercase">Password Baru</label>
-                                        <input type="password" name="password_baru" class="form-control form-control-lg bg-light border-0" placeholder="Biarkan kosong jika tetap">
+                                        <label class="small text-muted fw-bold">PASSWORD BARU (KOSONGKAN JIKA TETAP)</label>
+                                        <input type="password" name="password_baru" class="form-control bg-light border-0">
                                     </div>
                                 </div>
                                 <div class="modal-footer border-top-0 pt-0">
@@ -138,20 +138,24 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="small text-muted fw-bold text-uppercase">Nama Lengkap</label>
-                        <input type="text" name="nama" class="form-control form-control-lg bg-light border-0" required placeholder="Contoh: Budi Santoso">
+                        <label class="small text-muted fw-bold">NAMA LENGKAP</label>
+                        <input type="text" name="nama" class="form-control form-control-lg bg-light border-0" required placeholder="Nama Lengkap">
                     </div>
                     <div class="mb-3">
-                        <label class="small text-muted fw-bold text-uppercase">Username</label>
-                        <input type="text" name="username" class="form-control form-control-lg bg-light border-0" required>
+                        <label class="small text-muted fw-bold">USERNAME</label>
+                        <input type="text" name="username" class="form-control form-control-lg bg-light border-0" required placeholder="Username Login">
+                    </div>
+                    <div class="mb-3">
+                        <label class="small text-muted fw-bold">NOMOR HP / WA</label>
+                        <input type="text" name="no_hp" class="form-control form-control-lg bg-light border-0" placeholder="0812...">
                     </div>
                     <div class="row">
                         <div class="col-6 mb-3">
-                            <label class="small text-muted fw-bold text-uppercase">Password Awal</label>
+                            <label class="small text-muted fw-bold">PASSWORD AWAL</label>
                             <input type="text" name="password" class="form-control form-control-lg bg-light border-0" value="123456" readonly>
                         </div>
                         <div class="col-6 mb-3">
-                            <label class="small text-muted fw-bold text-uppercase">Role</label>
+                            <label class="small text-muted fw-bold">ROLE</label>
                             <select name="role" class="form-select form-select-lg bg-light border-0">
                                 <option value="guru">Guru</option>
                                 <option value="staff">Staff</option>

@@ -8,11 +8,12 @@ if(!in_array($_SESSION['user']['role'], ['admin', 'pengurus'])){
     exit;
 }
 
-// Data Riwayat
-$riwayat = $pdo->query("SELECT r.*, u.nama_lengkap 
-                        FROM tutup_buku r 
-                        LEFT JOIN anggota u ON r.dibuat_oleh = u.id 
-                        ORDER BY r.id DESC")->fetchAll();
+// PERBAIKAN: Mengganti 'dibuat_oleh' menjadi 'user_id' agar sesuai dengan database
+$sql = "SELECT r.*, u.nama_lengkap 
+        FROM tutup_buku r 
+        LEFT JOIN anggota u ON r.user_id = u.id 
+        ORDER BY r.id DESC";
+$riwayat = $pdo->query($sql)->fetchAll();
 
 // Bulan & Tahun ini
 $bulan_ini = date('m');
@@ -45,7 +46,7 @@ $tahun_ini = date('Y');
                     <th class="ps-4">Periode</th>
                     <th>Tgl Proses</th>
                     <th>Oleh</th>
-                    <th class="text-end">Saldo Akhir Kas</th>
+                    <th class="text-end">Saldo Kas Fisik</th>
                     <th class="text-end pe-4">Total Aset</th>
                 </tr>
             </thead>
@@ -58,10 +59,10 @@ $tahun_ini = date('Y');
                 ?>
                 <tr>
                     <td class="ps-4 fw-bold text-primary"><?= $nm_bulan ?> <?= $r['tahun'] ?></td>
-                    <td class="text-muted small"><?= date('d/m/Y H:i', strtotime($r['tanggal_proses'])) ?></td>
-                    <td class="fw-bold"><?= htmlspecialchars($r['nama_lengkap']) ?></td>
-                    <td class="text-end fw-bold"><?= formatRp($r['saldo_kas_fisik']) ?></td>
-                    <td class="text-end pe-4 fw-bold"><?= formatRp($r['total_aset']) ?></td>
+                    <td class="text-muted small"><?= date('d/m/Y H:i', strtotime($r['created_at'])) ?></td>
+                    <td class="fw-bold"><?= htmlspecialchars($r['nama_lengkap'] ?? 'System') ?></td>
+                    <td class="text-end fw-bold"><?= formatRp($r['saldo_akhir']) ?></td>
+                    <td class="text-end pe-4 fw-bold"><?= formatRp($r['saldo_akhir']) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

@@ -9,7 +9,8 @@ $stmt->execute([$id_guru]);
 $pinjaman = $stmt->fetchAll();
 
 // 2. Ambil Kasbon Belanja (Jajan)
-$sql_kasbon = "SELECT * FROM kasbon_belanja WHERE anggota_id = ? ORDER BY tanggal DESC";
+// PERBAIKAN: Mengganti 'kasbon_belanja' menjadi 'kasbon' dan 'tanggal' menjadi 'tanggal_pinjam'
+$sql_kasbon = "SELECT * FROM kasbon WHERE anggota_id = ? ORDER BY tanggal_pinjam DESC";
 $stmt2 = $pdo->prepare($sql_kasbon);
 $stmt2->execute([$id_guru]);
 $kasbon = $stmt2->fetchAll();
@@ -60,7 +61,7 @@ $kasbon = $stmt2->fetchAll();
     <div class="col-md-12">
         <div class="card border-0 shadow-sm rounded-4 border-start border-5 border-warning">
             <div class="card-header bg-white py-3">
-                <h6 class="fw-bold mb-0 text-warning text-dark">Riwayat Kasbon Belanja (Jajan/ATK)</h6>
+                <h6 class="fw-bold mb-0 text-dark">Riwayat Kasbon Belanja (Jajan/ATK)</h6>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -76,7 +77,7 @@ $kasbon = $stmt2->fetchAll();
                         <tbody>
                             <?php foreach($kasbon as $k): ?>
                             <tr>
-                                <td class="ps-4"><?= date('d/m/Y', strtotime($k['tanggal'])) ?></td>
+                                <td class="ps-4"><?= date('d/m/Y', strtotime($k['tanggal_pinjam'])) ?></td>
                                 <td><?= htmlspecialchars($k['keterangan']) ?></td>
                                 <td class="fw-bold text-danger"><?= formatRp($k['total_belanja']) ?></td>
                                 <td>
