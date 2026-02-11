@@ -1,51 +1,142 @@
 <?php
-// --- 1. HITUNG SALDO KAS FISIK (Total Uang di Tangan) ---
-// Menghitung seluruh uang masuk dikurangi uang keluar dari semua kategori
-// Ini mencerminkan uang real yang ada di brankas/rekening
-$q_kas = $pdo->query("SELECT SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE -jumlah END) as saldo FROM transaksi_kas")->fetch();
-$kas_fisik = $q_kas['saldo'] ?? 0;
+// pages/dashboard.php
 
-// --- 2. HITUNG KEWAJIBAN / DANA MENGENDAP (Uang Orang Lain) ---
-// a. Tabungan Siswa/Guru (Saldo Simpanan)
-$q_simp = $pdo->query("SELECT SUM(CASE WHEN tipe_transaksi='setor' THEN jumlah ELSE -jumlah END) as saldo FROM simpanan")->fetch();
-$total_tabungan = $q_simp['saldo'] ?? 0;
+// =========================================================
+// BAGIAN 1: DASHBOARD KHUSUS STAFF (OPERASIONAL HARIAN)
+// =========================================================
+if($_SESSION['user']['role'] == 'staff') {
+    // 1. Hitung Transaksi Hari Ini
+    $today = date('Y-m-d');
+    $trx = $pdo->query("SELECT COUNT(*) FROM transaksi_kas WHERE tanggal LIKE '$today%'")->fetchColumn();
+    
+    // 2. Hitung Stok Menipis (Warning)
+    $stok_koperasi = 0;
+    try {
+        $stok_koperasi = $pdo->query("SELECT COUNT(*) FROM stok_koperasi WHERE stok < 5")->fetchColumn();
+    } catch(Exception $e){}
+    
+    $stok_sekolah = 0;
+    try {
+        $stok_sekolah = $pdo->query("SELECT COUNT(*) FROM stok_sekolah WHERE stok < 5")->fetchColumn();
+    } catch(Exception $e){}
+    
+    $alert_stok = $stok_koperasi + $stok_sekolah;
+    
+    // 3. Hitung Titipan Belum Bayar (Pending)
+    $titipan = 0;
+    try {
+        $titipan = $pdo->query("SELECT COUNT(*) FROM titipan WHERE status != 'lunas'")->fetchColumn();
+    } catch(Exception $e){}
+?>
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="fw-bold text-dark">Halo, Staff <?= htmlspecialchars($_SESSION['user']['nama_lengkap']) ?>! 👋</h2>
+            <p class="text-muted">Selamat bertugas. Berikut ringkasan operasional hari ini.</p>
+        </div>
+    </div>
 
-// b. Hutang Titipan (Barang laku tapi uang belum disetor ke guru)
-// Hutang = Stok Terjual * Harga Modal
-$q_titip = $pdo->query("SELECT SUM(stok_terjual * harga_modal) as hutang FROM titipan")->fetch();
-$hutang_titipan = $q_titip['hutang'] ?? 0;
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-5 border-primary">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0 bg-primary bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-cash-register fa-2x text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-uppercase text-muted small fw-bold mb-1">Transaksi Hari Ini</h6>
+                            <h2 class="mb-0 fw-bold text-dark"><?= $trx ?></h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-5 border-warning">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0 bg-warning bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-uppercase text-muted small fw-bold mb-1">Stok Menipis (< 5)</h6>
+                            <h2 class="mb-0 fw-bold text-dark"><?= $alert_stok ?> <small class="fs-6 text-muted">Item</small></h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-$total_kewajiban = $total_tabungan + $hutang_titipan;
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-5 border-info">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0 bg-info bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-box-open fa-2x text-info"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-uppercase text-muted small fw-bold mb-1">Titipan Aktif</h6>
+                            <h2 class="mb-0 fw-bold text-dark"><?= $titipan ?></h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-// --- 3. HITUNG DANA BEBAS (Modal Sendiri / Real Cash) ---
-// Uang yang aman dibelanjakan untuk operasional
-$dana_bebas = $kas_fisik - $total_kewajiban;
+<?php 
+// =========================================================
+// BAGIAN 2: DASHBOARD ADMIN & PENGURUS (KEUANGAN LENGKAP)
+// =========================================================
+} else {
 
-// --- 4. DATA PENDUKUNG (Member & Stok) ---
-// Total Anggota Aktif
-$q_anggota = $pdo->query("SELECT COUNT(*) as total FROM anggota WHERE status_aktif=1")->fetch();
-$jml_anggota = $q_anggota['total'];
+    // --- 1. HITUNG SALDO KAS FISIK (Total Uang di Tangan) ---
+    // Menghitung seluruh uang masuk dikurangi uang keluar dari semua kategori
+    $q_kas = $pdo->query("SELECT SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE -jumlah END) as saldo FROM transaksi_kas")->fetch();
+    $kas_fisik = $q_kas['saldo'] ?? 0;
 
-// Stok Menipis (Logic Lama Tetap Dipertahankan)
-$limit_stok = 5;
-$stok_menipis_list = [];
+    // --- 2. HITUNG KEWAJIBAN / DANA MENGENDAP (Uang Orang Lain) ---
+    // a. Tabungan Siswa/Guru (Saldo Simpanan)
+    $q_simp = $pdo->query("SELECT SUM(saldo) as saldo FROM simpanan")->fetch();
+    $total_tabungan = $q_simp['saldo'] ?? 0;
 
-// Cek Koperasi
-try {
-    $sql = "SELECT id, nama_barang as nama, 'Koperasi' as jenis, stok as sisa FROM stok_koperasi WHERE stok <= $limit_stok";
-    $stok_menipis_list = array_merge($stok_menipis_list, $pdo->query($sql)->fetchAll());
-} catch (Exception $e) {}
+    // b. Hutang Titipan (Barang laku tapi uang belum disetor ke guru)
+    $hutang_titipan = 0;
+    try {
+        $q_titip = $pdo->query("SELECT SUM(stok_terjual * harga_beli) as hutang FROM titipan WHERE status != 'lunas'")->fetch();
+        $hutang_titipan = $q_titip['hutang'] ?? 0;
+    } catch(Exception $e){}
 
-// Cek Titipan
-try {
-    $sql = "SELECT id, nama_barang as nama, 'Titipan' as jenis, (stok_awal - stok_terjual) as sisa FROM titipan WHERE (stok_awal - stok_terjual) <= $limit_stok";
-    $stok_menipis_list = array_merge($stok_menipis_list, $pdo->query($sql)->fetchAll());
-} catch (Exception $e) {}
+    $total_kewajiban = $total_tabungan + $hutang_titipan;
 
-$total_alert = count($stok_menipis_list);
+    // --- 3. HITUNG DANA BEBAS (Modal Sendiri / Real Cash) ---
+    $dana_bebas = $kas_fisik - $total_kewajiban;
 
-// Transaksi Terakhir (Menampilkan semua mutasi agar sinkron dengan Kas Fisik)
-$recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id DESC LIMIT 7")->fetchAll();
+    // --- 4. DATA PENDUKUNG (Member & Stok) ---
+    $q_anggota = $pdo->query("SELECT COUNT(*) as total FROM anggota WHERE status_aktif=1")->fetch();
+    $jml_anggota = $q_anggota['total'];
+
+    // Stok Menipis
+    $limit_stok = 5;
+    $stok_menipis_list = [];
+
+    // Cek Koperasi
+    try {
+        $sql = "SELECT id, nama_barang as nama, 'Koperasi' as jenis, stok as sisa FROM stok_koperasi WHERE stok <= $limit_stok";
+        $stok_menipis_list = array_merge($stok_menipis_list, $pdo->query($sql)->fetchAll());
+    } catch (Exception $e) {}
+
+    // Cek Titipan
+    try {
+        $sql = "SELECT id, nama_barang as nama, 'Titipan' as jenis, (stok_awal - stok_terjual) as sisa FROM titipan WHERE (stok_awal - stok_terjual) <= $limit_stok AND status != 'lunas'";
+        $stok_menipis_list = array_merge($stok_menipis_list, $pdo->query($sql)->fetchAll());
+    } catch (Exception $e) {}
+
+    $total_alert = count($stok_menipis_list);
+
+    // Transaksi Terakhir
+    $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id DESC LIMIT 7")->fetchAll();
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -55,7 +146,7 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
     </div>
     <div class="d-none d-md-block">
         <span class="bg-white px-3 py-2 rounded-pill shadow-sm text-muted small border">
-            <i class="far fa-calendar-alt me-2 text-primary"></i> <?= tglIndo(date('Y-m-d')) ?>
+            <i class="far fa-calendar-alt me-2 text-primary"></i> <?= date('d M Y') ?>
         </span>
     </div>
 </div>
@@ -210,3 +301,4 @@ $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id
         </div>
     </div>
 </div>
+<?php } ?>

@@ -1,145 +1,88 @@
 <?php
-// ... (Logika PHP Simpan/Update SAMA PERSIS dengan sebelumnya, tidak berubah) ...
-if(isset($_POST['simpan_penjualan'])){
-    $tanggal = $_POST['tanggal'];
-    $jumlah = $_POST['jumlah'];
-    $keterangan = $_POST['keterangan'];
-    if(cekStatusPeriode($pdo, $tanggal)){
-        echo "<script>alert('GAGAL! Periode TUTUP BUKU.'); window.location='kas/kas_penjualan';</script>";
-    } elseif($jumlah > 0){
-        $sql = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, 'penjualan_harian', 'masuk', ?, ?, ?)";
-        $pdo->prepare($sql)->execute([$tanggal, $jumlah, $keterangan, $_SESSION['user']['id']]);
-        echo "<script>alert('Berhasil!'); window.location='kas/kas_penjualan';</script>";
-    }
-}
-if(isset($_POST['update_penjualan'])){
-    $id = $_POST['id_transaksi']; $tanggal = $_POST['tanggal']; $jumlah = $_POST['jumlah']; $keterangan = $_POST['keterangan'];
-    $cek = $pdo->prepare("SELECT tanggal FROM transaksi_kas WHERE id = ?"); $cek->execute([$id]); $tgl_lama = $cek->fetch()['tanggal'];
-    if(cekStatusPeriode($pdo, $tgl_lama) || cekStatusPeriode($pdo, $tanggal)){
-        echo "<script>alert('GAGAL! Periode TUTUP BUKU.'); window.location='kas/kas_penjualan';</script>";
-    } else {
-        $pdo->prepare("UPDATE transaksi_kas SET tanggal=?, jumlah=?, keterangan=? WHERE id=?")->execute([$tanggal, $jumlah, $keterangan, $id]);
-        echo "<script>alert('Update Berhasil!'); window.location='kas/kas_penjualan';</script>";
+// pages/kas/kas_penjualan.php
+require_once 'config/database.php';
+
+// PROSES SIMPAN OMZET
+if(isset($_POST['simpan_omzet'])){
+    try {
+        $tanggal = $_POST['tanggal'];
+        $jumlah  = $_POST['jumlah'];
+        $ket_input = $_POST['keterangan'];
+        
+        $keterangan = "Omzet Harian Toko";
+        if(!empty($ket_input)) $keterangan .= " (" . $ket_input . ")";
+
+        // Langsung catat ke KAS (Uang Masuk)
+        $sql = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, 'penjualan_toko', 'masuk', ?, ?, ?)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$tanggal, $jumlah, $keterangan, $_SESSION['user']['id']]);
+
+        echo "<script>alert('Omzet berhasil disimpan!'); window.location='index.php?page=kas/kas_penjualan';</script>";
+    } catch(Exception $e) {
+        echo "<script>alert('Gagal: ".$e->getMessage()."');</script>";
     }
 }
 
-$hari_ini = date('Y-m-d');
-$stmt = $pdo->prepare("SELECT * FROM transaksi_kas WHERE kategori='penjualan_harian' AND tanggal = ? ORDER BY id DESC");
-$stmt->execute([$hari_ini]);
-$penjualan_hari_ini = $stmt->fetchAll();
-$total_hari_ini = 0; foreach($penjualan_hari_ini as $p) $total_hari_ini += $p['jumlah'];
+// RIWAYAT 5 HARI TERAKHIR
+$riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE kategori = 'penjualan_toko' ORDER BY tanggal DESC LIMIT 5")->fetchAll();
 ?>
 
-<div class="row align-items-center mb-4">
-    <div class="col">
-        <h6 class="text-uppercase text-muted small ls-1 mb-1">Pemasukan Toko</h6>
-        <h2 class="h3 fw-bold mb-0">Kasir Penjualan</h2>
-    </div>
-</div>
-
-<div class="row g-4">
-    <div class="col-lg-4">
-        <div class="card h-100 border-0 shadow-lg overflow-hidden">
-            <div class="card-body bg-gradient-success text-white p-4 d-flex flex-column justify-content-center">
-                <div class="mb-4 text-center">
-                    <div class="bg-white bg-opacity-25 rounded-circle p-3 d-inline-block mb-3">
-                        <i class="fas fa-cash-register fa-3x"></i>
-                    </div>
-                    <h4 class="fw-bold">Input Omzet</h4>
-                    <p class="text-white-50 small">Masukkan total uang di laci (Tunai).</p>
-                </div>
-
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold m-0 text-success"><i class="fas fa-cash-register me-2"></i> Input Omzet Harian</h5>
+            </div>
+            <div class="card-body p-4">
                 <form method="POST">
                     <div class="mb-3">
-                        <label class="small text-white-50 fw-bold text-uppercase">Tanggal</label>
-                        <input type="date" name="tanggal" class="form-control form-control-lg border-0 bg-white bg-opacity-10 text-white" value="<?= date('Y-m-d') ?>" required>
+                        <label class="form-label fw-bold">Tanggal Omzet</label>
+                        <input type="date" name="tanggal" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="mb-3">
-                        <label class="small text-white-50 fw-bold text-uppercase">Nominal Total (Rp)</label>
-                        <input type="number" name="jumlah" class="form-control form-control-lg border-0 bg-white text-success fw-bold" placeholder="0" required>
-                        <div class="form-text text-white-50 small mt-2">
-                            <i class="fas fa-info-circle me-1"></i> Termasuk hasil penjualan <b>Barang Titipan (Konsinyasi)</b>.
+                        <label class="form-label fw-bold">Total Uang Masuk (Rp)</label>
+                        <div class="input-group">
+                            <span class="input-group-text fw-bold">Rp</span>
+                            <input type="number" name="jumlah" class="form-control fw-bold" placeholder="0" min="100" required>
                         </div>
+                        <small class="text-muted">Masukkan total uang tunai yang didapat hari ini.</small>
                     </div>
                     <div class="mb-4">
-                        <label class="small text-white-50 fw-bold text-uppercase">Catatan</label>
-                        <textarea name="keterangan" class="form-control border-0 bg-white bg-opacity-10 text-white" rows="2" placeholder="Contoh: Snack, ATK & Titipan Guru"></textarea>
+                        <label class="form-label fw-bold">Catatan (Opsional)</label>
+                        <textarea name="keterangan" class="form-control" rows="2" placeholder="Contoh: Laris manis, atau Penjualan shift pagi"></textarea>
                     </div>
-                    <button type="submit" name="simpan_penjualan" class="btn btn-light w-100 py-3 text-success fw-bold shadow-sm">
-                        <i class="fas fa-plus-circle me-2"></i> Simpan Data
+                    <button type="submit" name="simpan_omzet" class="btn btn-success w-100 rounded-pill fw-bold py-2 shadow-sm">
+                        <i class="fas fa-save me-2"></i> SIMPAN OMZET
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold text-dark m-0"><i class="fas fa-history me-2 text-muted"></i> Riwayat Hari Ini</h6>
-                <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">
-                    Total: <?= formatRp($total_hari_ini) ?>
-                </span>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="fw-bold m-0 text-muted">Riwayat Input Terakhir</h6>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="ps-4">Waktu</th>
-                                <th>Keterangan</th>
-                                <th class="text-end">Jumlah</th>
-                                <th class="text-end pe-4">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($penjualan_hari_ini as $row): ?>
-                            <tr>
-                                <td class="ps-4 text-muted fw-bold"><?= date('H:i', strtotime($row['created_at'])) ?></td>
-                                <td><?= htmlspecialchars($row['keterangan']) ?></td>
-                                <td class="text-end fw-bold text-dark">+ <?= number_format($row['jumlah']) ?></td>
-                                <td class="text-end pe-4">
-                                    <div class="btn-group">
-                                        <a href="pages/cetak_struk.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-light text-dark" title="Print"><i class="fas fa-print"></i></a>
-                                        <button class="btn btn-sm btn-light text-primary" data-bs-toggle="modal" data-bs-target="#modalEdit<?= $row['id'] ?>"><i class="fas fa-pen"></i></button>
-                                        <a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=kas/kas_penjualan" class="btn btn-sm btn-light text-danger" onclick="return confirm('Hapus?')"><i class="fas fa-trash"></i></a>
-                                    </div>
-                                </td>
-                            </tr>
-                            
-                             <div class="modal fade" id="modalEdit<?= $row['id'] ?>" tabindex="-1">
-                                <div class="modal-dialog modal-sm">
-                                    <div class="modal-content border-0 shadow-lg rounded-4">
-                                        <form method="POST">
-                                            <div class="modal-body p-4">
-                                                <h6 class="fw-bold mb-3">Edit Transaksi</h6>
-                                                <input type="hidden" name="id_transaksi" value="<?= $row['id'] ?>">
-                                                <div class="mb-2">
-                                                    <label class="small text-muted fw-bold">Tanggal</label>
-                                                    <input type="date" name="tanggal" class="form-control bg-light border-0" value="<?= $row['tanggal'] ?>" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="small text-muted fw-bold">Jumlah</label>
-                                                    <input type="number" name="jumlah" class="form-control bg-light border-0" value="<?= $row['jumlah'] ?>" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="small text-muted fw-bold">Ket</label>
-                                                    <input type="text" name="keterangan" class="form-control bg-light border-0" value="<?= $row['keterangan'] ?>">
-                                                </div>
-                                                <button type="submit" name="update_penjualan" class="btn btn-success w-100 btn-sm fw-bold">Update</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <?php endforeach; ?>
-                            <?php if(empty($penjualan_hari_ini)): ?>
-                                <tr><td colspan="4" class="text-center py-5 text-muted">Belum ada data masuk.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Tanggal</th>
+                            <th>Keterangan</th>
+                            <th class="text-end pe-4">Jumlah</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($riwayat as $r): ?>
+                        <tr>
+                            <td class="ps-4"><?= date('d/m/Y', strtotime($r['tanggal'])) ?></td>
+                            <td class="small text-muted"><?= htmlspecialchars($r['keterangan']) ?></td>
+                            <td class="text-end pe-4 fw-bold text-success">+ <?= formatRp($r['jumlah']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

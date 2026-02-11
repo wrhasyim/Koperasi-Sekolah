@@ -1,4 +1,6 @@
 <?php
+// config/functions.php
+
 // --- FORMATTING ---
 function formatRp($angka){
     return "Rp " . number_format($angka, 0, ',', '.');
@@ -22,14 +24,12 @@ function cekLogin(){
     }
 }
 
-// --- LOG SYSTEM (AUDIT TRAIL) [BARU] ---
+// --- LOG SYSTEM ---
 function catatLog($pdo, $user_id, $aksi, $keterangan){
     try {
         $stmt = $pdo->prepare("INSERT INTO log_aktivitas (user_id, aksi, keterangan) VALUES (?, ?, ?)");
         $stmt->execute([$user_id, $aksi, $keterangan]);
-    } catch (Exception $e) {
-        // Silent error agar tidak mengganggu proses utama
-    }
+    } catch (Exception $e) {}
 }
 
 // --- UTILITIES ---
@@ -41,18 +41,13 @@ function cekStatusPeriode($pdo, $tanggal){
     $stmt = $pdo->prepare("SELECT id FROM tutup_buku WHERE bulan = ? AND tahun = ?");
     $stmt->execute([$bulan, $tahun]);
     
-    if($stmt->rowCount() > 0){
-        return true; // TERKUNCI
-    }
-    return false; // BUKA
+    if($stmt->rowCount() > 0){ return true; }
+    return false;
 }
 
 // --- FLASH MESSAGE ---
 function setFlash($type, $message){
-    $_SESSION['flash'] = [
-        'type' => $type,
-        'message' => $message
-    ];
+    $_SESSION['flash'] = ['type' => $type, 'message' => $message];
 }
 
 function displayFlash(){
@@ -72,21 +67,28 @@ function displayFlash(){
                 <div>$msg</div>
             </div>
             <button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>
-        </div>
-        ";
+        </div>";
     }
 }
 
+// --- PENGATURAN ---
 function getPengaturan($pdo, $kunci) {
     $stmt = $pdo->prepare("SELECT nilai FROM pengaturan WHERE kunci = ?");
     $stmt->execute([$kunci]);
     $res = $stmt->fetch();
-    return $res ? $res['nilai'] : ''; // Return string kosong jika tidak ada
+    return $res ? $res['nilai'] : ''; 
 }
 
-// Ambil semua pengaturan sekaligus (biar hemat query)
 function getAllPengaturan($pdo) {
     $stmt = $pdo->query("SELECT kunci, nilai FROM pengaturan");
-    return $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // Output: ['header_nama' => '...', 'persen_staff' => 20]
+    return $stmt->fetchAll(PDO::FETCH_KEY_PAIR); 
+}
+
+// --- [DIPERBAIKI] HELPER NAMA ANGGOTA ---
+function getNamaAnggota($pdo, $id){
+    if(!$id) return '-';
+    $stmt = $pdo->prepare("SELECT nama_lengkap FROM anggota WHERE id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetchColumn() ?: 'Tidak Diketahui';
 }
 ?>
