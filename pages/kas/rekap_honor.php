@@ -5,13 +5,13 @@
 $set = getAllPengaturan($pdo);
 
 // --- LOGIKA 1: HITUNG TOTAL SURPLUS BERSIH (SEUMUR HIDUP) ---
-// Surplus = (Semua Pemasukan - Semua Pengeluaran Operasional)
-// Pengecualian: Transaksi Seragam, Eskul, Simpan Pinjam, dan Pembayaran Honor itu sendiri
+// PERBAIKAN: Menambahkan 'modal_awal' ke dalam pengecualian agar tidak dihitung sebagai laba yang bisa dibagi
 $sql_surplus = "SELECT 
                     SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE 0 END) as total_masuk,
                     SUM(CASE WHEN arus = 'keluar' THEN jumlah ELSE 0 END) as total_keluar
                 FROM transaksi_kas 
                 WHERE kategori NOT IN (
+                    'modal_awal',
                     'penjualan_seragam', 'penjualan_eskul', 
                     'bagi_hasil_staff', 'bagi_hasil_pengurus', 'bagi_hasil_pembina', 'bagi_hasil_dansos',
                     'pinjaman_anggota', 'bayar_pinjaman',
@@ -33,15 +33,9 @@ $tipe_list = ['staff', 'pengurus', 'pembina', 'dansos'];
 
 foreach($tipe_list as $tipe){
     $persen = $set['persen_'.$tipe] ?? 0;
-    
-    // Hak Seharusnya (Sejak awal berdiri)
     $total_hak = $surplus_kotor * ($persen / 100);
-    
-    // Yang Sudah Dibayar (Sejak awal berdiri)
     $kat_db = "bagi_hasil_" . $tipe;
     $sudah_bayar = $q_paid[$kat_db] ?? 0;
-    
-    // Sisa yang BISA DIBAYAR SEKARANG (Akumulasi)
     $sisa_bayar = $total_hak - $sudah_bayar;
     
     $data_honor[$tipe] = [
@@ -49,11 +43,10 @@ foreach($tipe_list as $tipe){
         'persen' => $persen,
         'hak_total' => $total_hak,
         'terbayar' => $sudah_bayar,
-        'sisa' => $sisa_bayar // Angka ini yang akan dibayar
+        'sisa' => $sisa_bayar
     ];
 }
 
-// RIWAYAT (Ambil 10 Terakhir Saja)
 $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE kategori IN ('bagi_hasil_staff', 'bagi_hasil_pengurus', 'bagi_hasil_pembina', 'bagi_hasil_dansos') ORDER BY tanggal DESC LIMIT 10")->fetchAll();
 ?>
 
@@ -71,9 +64,9 @@ $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE kategori IN ('bagi_has
     <div class="card-body p-4">
         <div class="row align-items-center">
             <div class="col-md-8 position-relative" style="z-index: 2;">
-                <h5 class="text-white-50 text-uppercase small fw-bold mb-1">Total Surplus Operasional (All Time)</h5>
+                <h5 class="text-white-50 text-uppercase small fw-bold mb-1">Total Surplus Operasional (Murni)</h5>
                 <h2 class="mb-0 fw-bold"><?= formatRp($surplus_kotor) ?></h2>
-                <small class="text-white-50">Total akumulasi laba bersih operasional sejak awal sistem.</small>
+                <small class="text-white-50">Total laba bersih operasional (TIDAK termasuk Modal Awal).</small>
             </div>
             <i class="fas fa-chart-line fa-5x position-absolute end-0 bottom-0 opacity-25 me-4 mb-n2" style="transform: rotate(-15deg);"></i>
         </div>
@@ -87,7 +80,6 @@ $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE kategori IN ('bagi_has
 
     foreach($data_honor as $key => $d): 
         $color = $colors[$key];
-        $txt_cls = ($color == 'warning') ? 'text-dark' : 'text-white';
         $btn_cls = ($color == 'warning') ? 'btn-warning text-dark' : 'btn-'.$color;
     ?>
     <div class="col-md-6 col-xl-3">
@@ -96,31 +88,22 @@ $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE kategori IN ('bagi_has
                 <div class="d-flex justify-content-between mb-3">
                     <div>
                         <h6 class="fw-bold text-muted text-uppercase small mb-1"><?= $d['label'] ?> (<?= $d['persen'] ?>%)</h6>
-                        <span class="badge bg-<?= $color ?> bg-opacity-10 text-<?= $color ?> rounded-pill">
-                            Jatah: <?= formatRp($d['hak_total']) ?>
-                        </span>
+                        <span class="badge bg-<?= $color ?> bg-opacity-10 text-<?= $color ?> rounded-pill">Jatah: <?= formatRp($d['hak_total']) ?></span>
                     </div>
-                    <div class="bg-<?= $color ?> bg-opacity-10 p-2 rounded-circle text-<?= $color ?>" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
-                        <i class="fas fa-<?= $icons[$key] ?>"></i>
-                    </div>
+                    <div class="bg-<?= $color ?> bg-opacity-10 p-2 rounded-circle text-<?= $color ?>" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-<?= $icons[$key] ?>"></i></div>
                 </div>
-                
                 <div class="mb-4">
-                    <small class="text-muted d-block" style="font-size: 0.75rem;">Sisa Belum Dibayar (Akumulasi)</small>
+                    <small class="text-muted d-block" style="font-size: 0.75rem;">Sisa Belum Dibayar</small>
                     <h3 class="fw-bold text-dark mb-0"><?= formatRp($d['sisa']) ?></h3>
                 </div>
-
-                <?php if($d['sisa'] > 500): // Hanya muncul tombol jika ada sisa > 500 rupiah ?>
-                    <form action="process/kas_bayar_honor.php" method="POST" onsubmit="return confirm('Bayarkan akumulasi honor <?= $d['label'] ?> sebesar <?= formatRp($d['sisa']) ?>?')">
+                <?php if($d['sisa'] > 500): ?>
+                    <form action="process/kas_bayar_honor.php" method="POST" onsubmit="return confirm('Bayar honor <?= $d['label'] ?>?')">
                         <input type="hidden" name="tipe" value="<?= $key ?>">
-                        <input type="hidden" name="nominal" value="<?= $d['sisa'] ?>"> <button type="submit" class="btn <?= $btn_cls ?> w-100 rounded-pill fw-bold shadow-sm">
-                            <i class="fas fa-money-bill-wave me-2"></i> Bayar Lunas
-                        </button>
+                        <input type="hidden" name="nominal" value="<?= $d['sisa'] ?>"> 
+                        <button type="submit" class="btn <?= $btn_cls ?> w-100 rounded-pill fw-bold shadow-sm">Bayar Lunas</button>
                     </form>
                 <?php else: ?>
-                    <button class="btn btn-light text-muted w-100 rounded-pill border" disabled>
-                        <i class="fas fa-check me-2"></i> Lunas
-                    </button>
+                    <button class="btn btn-light text-muted w-100 rounded-pill border" disabled><i class="fas fa-check me-2"></i> Lunas</button>
                 <?php endif; ?>
             </div>
         </div>
@@ -129,28 +112,15 @@ $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE kategori IN ('bagi_has
 </div>
 
 <div class="card border-0 shadow-sm rounded-4">
-    <div class="card-header bg-white py-3 border-bottom">
-        <h6 class="fw-bold text-dark mb-0"><i class="fas fa-history me-2"></i> 10 Pembayaran Terakhir</h6>
-    </div>
+    <div class="card-header bg-white py-3 border-bottom"><h6 class="fw-bold text-dark mb-0"><i class="fas fa-history me-2"></i> 10 Pembayaran Terakhir</h6></div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead class="bg-light">
-                <tr>
-                    <th class="ps-4">Tanggal</th>
-                    <th>Jenis</th>
-                    <th>Keterangan</th>
-                    <th class="text-end pe-4">Jumlah Keluar</th>
-                </tr>
-            </thead>
+            <thead class="bg-light"><tr><th class="ps-4">Tanggal</th><th>Jenis</th><th>Keterangan</th><th class="text-end pe-4">Jumlah</th></tr></thead>
             <tbody>
                 <?php foreach($riwayat as $r): ?>
                 <tr>
                     <td class="ps-4 text-muted small fw-bold"><?= date('d/m/Y H:i', strtotime($r['tanggal'])) ?></td>
-                    <td>
-                        <span class="badge bg-secondary bg-opacity-10 text-dark border">
-                            <?= strtoupper(str_replace('bagi_hasil_', '', $r['kategori'])) ?>
-                        </span>
-                    </td>
+                    <td><span class="badge bg-secondary bg-opacity-10 text-dark border"><?= strtoupper(str_replace('bagi_hasil_', '', $r['kategori'])) ?></span></td>
                     <td class="small"><?= htmlspecialchars($r['keterangan']) ?></td>
                     <td class="text-end pe-4 fw-bold text-danger">- <?= formatRp($r['jumlah']) ?></td>
                 </tr>

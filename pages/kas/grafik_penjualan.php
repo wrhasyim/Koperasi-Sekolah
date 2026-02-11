@@ -1,4 +1,6 @@
 <?php
+// pages/kas/grafik_penjualan.php
+
 // 1. SETUP PARAMETER & DEFAULT
 $mode  = isset($_GET['mode']) ? $_GET['mode'] : 'harian';
 $bulan = isset($_GET['bulan']) ? $_GET['bulan'] : date('m');
@@ -12,8 +14,8 @@ $data_masuk = [];
 $data_keluar = [];
 $judul_grafik = "";
 
-// Filter Kategori: HANYA KOPERASI MURNI (Exclude Seragam/Eskul)
-$filter_kategori = "AND kategori NOT IN ('penjualan_seragam', 'penjualan_eskul')";
+// PERBAIKAN: Menambahkan 'modal_awal' ke dalam pengecualian agar grafik murni operasional
+$filter_kategori = "AND kategori NOT IN ('penjualan_seragam', 'penjualan_eskul', 'modal_awal')";
 
 if($mode == 'harian'){
     // --- MODE HARIAN (Data per tanggal dalam 1 bulan) ---
@@ -55,18 +57,16 @@ $stmt->execute($params);
 $raw_data = $stmt->fetchAll();
 
 // 4. FORMAT DATA KE ARRAY JS
-// Inisialisasi array kosong agar grafik tetap muncul walau data kosong
 $temp_data = [];
 foreach($raw_data as $r) {
     $temp_data[$r['label_waktu']] = $r;
 }
 
 if($mode == 'harian'){
-    // Loop tanggal 1 s/d jumlah hari di bulan itu
     $jml_hari = cal_days_in_month(CAL_GREGORIAN, $bulan, $tahun);
     for($i=1; $i<=$jml_hari; $i++){
-        $tgl_cek = sprintf("%04d-%02d-%02d", $tahun, $bulan, $i); // YYYY-MM-DD
-        $labels[] = date('d', strtotime($tgl_cek)); // Label tgl saja
+        $tgl_cek = sprintf("%04d-%02d-%02d", $tahun, $bulan, $i);
+        $labels[] = date('d', strtotime($tgl_cek));
         $data_masuk[] = isset($temp_data[$tgl_cek]) ? $temp_data[$tgl_cek]['total_masuk'] : 0;
         $data_keluar[] = isset($temp_data[$tgl_cek]) ? $temp_data[$tgl_cek]['total_keluar'] : 0;
     }
@@ -85,7 +85,6 @@ if($mode == 'harian'){
     }
 }
 
-// JSON Encode untuk dikirim ke Javascript
 $js_labels = json_encode($labels);
 $js_masuk = json_encode($data_masuk);
 $js_keluar = json_encode($data_keluar);
@@ -94,24 +93,24 @@ $js_keluar = json_encode($data_keluar);
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Visualisasi Data</h6>
-        <h2 class="h3 fw-bold mb-0">Analisis Keuangan</h2>
+        <h2 class="h3 fw-bold mb-0 text-dark">Analisis Keuangan</h2>
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body bg-light rounded-3 p-3">
+<div class="card border-0 shadow-sm mb-4 rounded-4">
+    <div class="card-body bg-light rounded-4 p-3">
         <form method="GET" class="row g-2 align-items-center">
-            
+            <input type="hidden" name="page" value="kas/grafik_penjualan">
             <div class="col-auto">
                 <div class="btn-group" role="group">
                     <input type="radio" class="btn-check" name="mode" id="mode_harian" value="harian" <?= $mode=='harian'?'checked':'' ?> onchange="this.form.submit()">
-                    <label class="btn btn-outline-primary btn-sm fw-bold" for="mode_harian">Harian</label>
+                    <label class="btn btn-outline-primary btn-sm fw-bold px-3" for="mode_harian">Harian</label>
 
                     <input type="radio" class="btn-check" name="mode" id="mode_bulanan" value="bulanan" <?= $mode=='bulanan'?'checked':'' ?> onchange="this.form.submit()">
-                    <label class="btn btn-outline-primary btn-sm fw-bold" for="mode_bulanan">Bulanan</label>
+                    <label class="btn btn-outline-primary btn-sm fw-bold px-3" for="mode_bulanan">Bulanan</label>
 
                     <input type="radio" class="btn-check" name="mode" id="mode_tahunan" value="tahunan" <?= $mode=='tahunan'?'checked':'' ?> onchange="this.form.submit()">
-                    <label class="btn btn-outline-primary btn-sm fw-bold" for="mode_tahunan">Tahunan</label>
+                    <label class="btn btn-outline-primary btn-sm fw-bold px-3" for="mode_tahunan">Tahunan</label>
                 </div>
             </div>
 
@@ -119,7 +118,7 @@ $js_keluar = json_encode($data_keluar);
 
             <?php if($mode == 'harian'): ?>
             <div class="col-auto">
-                <select name="bulan" class="form-select form-select-sm border-0 shadow-sm bg-white fw-bold" onchange="this.form.submit()">
+                <select name="bulan" class="form-select form-select-sm border-0 shadow-sm fw-bold" onchange="this.form.submit()">
                     <?php 
                     $bln_indo = [1=>"Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
                     for($i=1; $i<=12; $i++){
@@ -132,7 +131,7 @@ $js_keluar = json_encode($data_keluar);
             <?php endif; ?>
 
             <div class="col-auto">
-                <select name="tahun" class="form-select form-select-sm border-0 shadow-sm bg-white fw-bold" onchange="this.form.submit()">
+                <select name="tahun" class="form-select form-select-sm border-0 shadow-sm fw-bold" onchange="this.form.submit()">
                     <?php 
                     for($y=date('Y'); $y>=2020; $y--){
                         $sel = ($y==$tahun) ? 'selected' : '';
@@ -141,7 +140,6 @@ $js_keluar = json_encode($data_keluar);
                     ?>
                 </select>
             </div>
-
         </form>
     </div>
 </div>
@@ -150,8 +148,8 @@ $js_keluar = json_encode($data_keluar);
     <div class="col-lg-12">
         <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-chart-bar me-2"></i> <?= $judul_grafik ?></h6>
-                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">(Koperasi Murni)</small>
+                <h6 class="mb-0 fw-bold text-primary"><i class="fas fa-chart-line me-2"></i> <?= $judul_grafik ?></h6>
+                <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3">KOPERASI MURNI</span>
             </div>
             <div class="card-body p-4">
                 <div style="height: 450px;">
@@ -166,17 +164,16 @@ $js_keluar = json_encode($data_keluar);
 document.addEventListener("DOMContentLoaded", function() {
     var ctx = document.getElementById('grafikKeuangan').getContext('2d');
     
-    // Style Gradasi
     var gradientMasuk = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientMasuk.addColorStop(0, 'rgba(28, 200, 138, 0.7)');
-    gradientMasuk.addColorStop(1, 'rgba(28, 200, 138, 0.05)');
+    gradientMasuk.addColorStop(0, 'rgba(28, 200, 138, 0.4)');
+    gradientMasuk.addColorStop(1, 'rgba(28, 200, 138, 0)');
 
     var gradientKeluar = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientKeluar.addColorStop(0, 'rgba(231, 74, 59, 0.7)');
-    gradientKeluar.addColorStop(1, 'rgba(231, 74, 59, 0.05)');
+    gradientKeluar.addColorStop(0, 'rgba(231, 74, 59, 0.4)');
+    gradientKeluar.addColorStop(1, 'rgba(231, 74, 59, 0)');
 
-    var myChart = new Chart(ctx, {
-        type: 'line', // Ganti jadi Line agar lebih smooth untuk trend, atau 'bar' jika suka batang
+    new Chart(ctx, {
+        type: 'line',
         data: {
             labels: <?= $js_labels ?>, 
             datasets: [
@@ -185,24 +182,22 @@ document.addEventListener("DOMContentLoaded", function() {
                     data: <?= $js_masuk ?>,
                     backgroundColor: gradientMasuk,
                     borderColor: '#1cc88a',
-                    borderWidth: 2,
+                    borderWidth: 3,
                     pointBackgroundColor: '#fff',
                     pointBorderColor: '#1cc88a',
                     pointRadius: 4,
-                    pointHoverRadius: 6,
                     fill: true,
-                    tension: 0.4 // Membuat garis melengkung (smooth)
+                    tension: 0.4 
                 },
                 {
                     label: 'Pengeluaran (Rp)',
                     data: <?= $js_keluar ?>,
                     backgroundColor: gradientKeluar,
                     borderColor: '#e74a3b',
-                    borderWidth: 2,
+                    borderWidth: 3,
                     pointBackgroundColor: '#fff',
                     pointBorderColor: '#e74a3b',
                     pointRadius: 4,
-                    pointHoverRadius: 6,
                     fill: true,
                     tension: 0.4
                 }
@@ -212,30 +207,13 @@ document.addEventListener("DOMContentLoaded", function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        font: { family: "'Inter', sans-serif", size: 12, weight: 'bold' },
-                        usePointStyle: true,
-                        padding: 20
-                    }
-                },
+                legend: { position: 'top', labels: { font: { weight: 'bold' }, usePointStyle: true, padding: 20 } },
                 tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    titleColor: '#2c3e50',
-                    bodyColor: '#2c3e50',
-                    borderColor: '#e3e6f0',
-                    borderWidth: 1,
-                    padding: 12,
-                    titleFont: { size: 14, weight: 'bold' },
+                    mode: 'index',
+                    intersect: false,
                     callbacks: {
                         label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(context.parsed.y);
-                            }
-                            return label;
+                            return context.dataset.label + ': ' + new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(context.parsed.y);
                         }
                     }
                 }
@@ -243,23 +221,13 @@ document.addEventListener("DOMContentLoaded", function() {
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: '#f8f9fc', borderDash: [5, 5] },
+                    grid: { color: '#f8f9fc' },
                     ticks: {
-                        callback: function(value) {
-                            return 'Rp ' + (value / 1000).toLocaleString('id-ID') + 'k'; // Singkat angka ribuan
-                        },
-                        font: { size: 11 }
+                        callback: function(value) { return 'Rp ' + (value / 1000).toLocaleString('id-ID') + 'k'; }
                     }
                 },
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 11 } }
-                }
-            },
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
+                x: { grid: { display: false } }
+            }
         }
     });
 });

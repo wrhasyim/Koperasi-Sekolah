@@ -1,378 +1,402 @@
 <?php
+// process/export_laporan_rapat.php
 session_start();
 require_once '../config/database.php';
 require_once '../config/functions.php'; 
 
-if(!isset($_SESSION['user'])){ die("Akses Ditolak."); }
-
-if(isset($_POST['export_rapat'])){
-    $bln_awal = $_POST['bulan_awal'];
-    $bln_akhir = $_POST['bulan_akhir'];
-    $tahun = $_POST['tahun'];
-    
-    // Filter Unit
-    $inc_seragam = isset($_POST['inc_seragam']);
-    $inc_eskul   = isset($_POST['inc_eskul']);
-
-    // Nama File
-    $nama_bln = [1=>"Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-    $periode_teks = $nama_bln[$bln_awal] . " s/d " . $nama_bln[$bln_akhir] . " " . $tahun;
-    $filename = "Laporan_Kinerja_Koperasi_$tahun.xls";
-
-    header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-
-    // ==========================================
-    // 1. HITUNG ARUS KAS (PEMASUKAN & PENGELUARAN)
-    // ==========================================
-    
-    // Pemasukan Koperasi (Harian)
-    $q_kop = $pdo->prepare("SELECT SUM(jumlah) as total FROM transaksi_kas 
-        WHERE YEAR(tanggal)=? AND MONTH(tanggal) BETWEEN ? AND ? 
-        AND kategori='penjualan_harian' AND arus='masuk'");
-    $q_kop->execute([$tahun, $bln_awal, $bln_akhir]);
-    $rev_koperasi = $q_kop->fetch()['total'] ?? 0;
-
-    // Pemasukan Seragam
-    $rev_seragam = 0;
-    if($inc_seragam){
-        $q_srg = $pdo->prepare("SELECT SUM(jumlah) as total FROM transaksi_kas 
-            WHERE YEAR(tanggal)=? AND MONTH(tanggal) BETWEEN ? AND ? 
-            AND kategori='penjualan_seragam' AND arus='masuk'");
-        $q_srg->execute([$tahun, $bln_awal, $bln_akhir]);
-        $rev_seragam = $q_srg->fetch()['total'] ?? 0;
-    }
-
-    // Pemasukan Eskul
-    $rev_eskul = 0;
-    if($inc_eskul){
-        $q_esk = $pdo->prepare("SELECT SUM(jumlah) as total FROM transaksi_kas 
-            WHERE YEAR(tanggal)=? AND MONTH(tanggal) BETWEEN ? AND ? 
-            AND kategori='penjualan_eskul' AND arus='masuk'");
-        $q_esk->execute([$tahun, $bln_awal, $bln_akhir]);
-        $rev_eskul = $q_esk->fetch()['total'] ?? 0;
-    }
-
-    // Total Pemasukan
-    $total_pendapatan = $rev_koperasi + $rev_seragam + $rev_eskul;
-
-    // Pengeluaran (Dirinci agar jelas uangnya buat apa)
-    $q_beban = $pdo->prepare("SELECT kategori, SUM(jumlah) as total FROM transaksi_kas 
-        WHERE YEAR(tanggal)=? AND MONTH(tanggal) BETWEEN ? AND ? 
-        AND arus='keluar' GROUP BY kategori");
-    $q_beban->execute([$tahun, $bln_awal, $bln_akhir]);
-    $list_beban = $q_beban->fetchAll(PDO::FETCH_KEY_PAIR);
-    $total_beban = array_sum($list_beban);
-
-    // Keuntungan Bersih (SHU)
-    $shu_periode = $total_pendapatan - $total_beban;
-
-
-    // ==========================================
-    // 2. HITUNG KEKAYAAN (POSISI HARTA)
-    // ==========================================
-    $tgl_akhir_db = "$tahun-$bln_akhir-31";
-
-    // Uang Tunai (Kas)
-    $q_kas = $pdo->prepare("SELECT SUM(CASE WHEN arus='masuk' THEN jumlah ELSE -jumlah END) as saldo FROM transaksi_kas WHERE tanggal <= ?");
-    $q_kas->execute([$tgl_akhir_db]);
-    $uang_tunai = $q_kas->fetch()['saldo'] ?? 0;
-
-    // Stok Barang (Aset Barang)
-    $stok_kop = $pdo->query("SELECT SUM(stok * harga_modal) FROM stok_koperasi")->fetchColumn() ?? 0;
-    $stok_srg = $inc_seragam ? ($pdo->query("SELECT SUM(stok * harga_modal) FROM stok_sekolah")->fetchColumn() ?? 0) : 0;
-    $stok_esk = $inc_eskul   ? ($pdo->query("SELECT SUM(stok * harga_modal) FROM stok_eskul")->fetchColumn() ?? 0)   : 0;
-    $total_stok = $stok_kop + $stok_srg + $stok_esk;
-
-    // Piutang (Uang kita di orang lain)
-    $q_piutang = $pdo->query("SELECT kategori_barang, SUM(sisa) as total FROM cicilan WHERE status='belum' GROUP BY kategori_barang")->fetchAll(PDO::FETCH_KEY_PAIR);
-    $piutang_seragam = $inc_seragam ? ($q_piutang['seragam'] ?? 0) : 0;
-    $piutang_eskul   = $inc_eskul   ? ($q_piutang['eskul'] ?? 0)   : 0;
-    $total_piutang   = $piutang_seragam + $piutang_eskul;
-
-    $total_harta = $uang_tunai + $total_stok + $total_piutang;
-
-
-    // ==========================================
-    // 3. KEWAJIBAN (HUTANG KOPERASI KE ORANG)
-    // ==========================================
-    
-    // Tabungan Siswa/Guru (Wajib bisa diambil kapan saja)
-    $q_simp = $pdo->query("SELECT SUM(CASE WHEN tipe_transaksi='setor' THEN jumlah ELSE 0 END) - SUM(CASE WHEN tipe_transaksi='tarik' THEN jumlah ELSE 0 END) as saldo FROM simpanan")->fetch();
-    $total_tabungan = $q_simp['saldo'] ?? 0;
-
-    // Titipan Guru (Barang Konsinyasi)
-    $hutang_titipan = $pdo->query("SELECT SUM(stok_terjual * harga_modal) FROM titipan")->fetchColumn() ?? 0;
-
-    $total_kewajiban = $total_tabungan + $hutang_titipan;
-
-    // Modal Bersih (Harta - Kewajiban)
-    $modal_bersih = $total_harta - $total_kewajiban;
-
-
-    // ==========================================
-    // 4. ANALISIS KESEHATAN (BAHASA MANUSIA)
-    // ==========================================
-    
-    // Cek Keamanan Uang (Likuiditas)
-    // Rumus: Apakah Uang Tunai cukup untuk bayar Tabungan jika ditarik semua?
-    $status_uang = "";
-    $warna_uang = "";
-    
-    if($total_kewajiban > 0){
-        $rasio_aman = ($uang_tunai / $total_kewajiban) * 100;
-        if($rasio_aman >= 100){
-            $status_uang = "SANGAT AMAN. Uang tunai yang tersedia (Rp ".number_format($uang_tunai).") lebih dari cukup untuk mengembalikan seluruh tabungan anggota saat ini.";
-            $warna_uang = "#c6efce"; // Hijau
-        } elseif($rasio_aman >= 50) {
-            $status_uang = "CUKUP AMAN. Sebagian uang sedang tertanam dalam bentuk Stok Barang. Jika anggota menarik tabungan serentak, perlu waktu menjual stok.";
-            $warna_uang = "#ffeb9c"; // Kuning
-        } else {
-            $status_uang = "WASPADA. Uang tunai menipis. Segera tagih piutang atau jual stok untuk mengamankan dana anggota.";
-            $warna_uang = "#ffc7ce"; // Merah
-        }
-    } else {
-        $status_uang = "AMAN. Tidak ada tanggungan hutang/tabungan.";
-        $warna_uang = "#c6efce";
-    }
-
-    // Ambil Data Penunggak
-    $q_tunggakan = $pdo->query("SELECT nama_siswa, kelas, sisa FROM cicilan WHERE sisa > 0 ORDER BY sisa DESC LIMIT 5")->fetchAll();
-
-    ?>
-    
-    <style>
-        body { font-family: Arial, sans-serif; }
-        .judul-besar { font-size: 20px; font-weight: bold; text-align: center; color: #1f4e78; }
-        .periode { font-size: 12px; text-align: center; margin-bottom: 20px; color: #555; }
-        
-        .box-header { background-color: #1f4e78; color: white; font-weight: bold; padding: 8px; font-size: 14px; }
-        .sub-header { background-color: #bdd7ee; font-weight: bold; padding-left: 20px; }
-        
-        .highlight-row { background-color: #ffffcc; font-weight: bold; border-top: 2px solid #000; }
-        .duit { text-align: right; mso-number-format:"\#\,\#\#0"; }
-        .center { text-align: center; }
-        .ket { font-style: italic; font-size: 11px; color: #444; }
-    </style>
-
-    <div class="judul-besar">LAPORAN KINERJA & KESEHATAN KOPERASI</div>
-    <div class="periode">Periode Laporan: <?= $periode_teks ?></div>
-    <br>
-
-    <table border="1" width="100%">
-        <tr>
-            <th colspan="2" class="box-header" style="background-color: #2e7d32;">I. RINGKASAN EKSEKUTIF (POIN PENTING)</th>
-        </tr>
-        <tr>
-            <td width="70%" style="padding: 10px;">
-                <b>1. Apakah Koperasi Untung?</b><br>
-                <span class="ket">Selisih antara total pemasukan dikurangi pengeluaran operasional & belanja.</span>
-            </td>
-            <td width="30%" class="duit" style="font-size: 16px; font-weight: bold; color: <?= $shu_periode >=0 ? 'green':'red' ?>;">
-                <?= $shu_periode >= 0 ? "UNTUNG ".formatRp($shu_periode) : "RUGI ".formatRp(abs($shu_periode)) ?>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 10px;">
-                <b>2. Berapa Uang Tunai yang Kita Pegang?</b><br>
-                <span class="ket">Uang real yang ada di laci kasir atau rekening bendahara saat ini.</span>
-            </td>
-            <td class="duit" style="font-size: 16px; font-weight: bold;">
-                <?= formatRp($uang_tunai) ?>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding: 10px;">
-                <b>3. Kekayaan Bersih Kita (Modal)?</b><br>
-                <span class="ket">Total Harta dikurangi titipan orang lain (Tabungan Siswa/Guru).</span>
-            </td>
-            <td class="duit" style="font-size: 16px; font-weight: bold; color: blue;">
-                <?= formatRp($modal_bersih) ?>
-            </td>
-        </tr>
-    </table>
-
-    <br><br>
-
-    <table border="1" width="100%">
-        <tr><th colspan="3" class="box-header">II. RINCIAN PEMASUKAN & PENGELUARAN</th></tr>
-        
-        <tr><td colspan="3" class="sub-header">A. SUMBER PEMASUKAN (UANG MASUK)</td></tr>
-        <tr>
-            <td width="5%" class="center">1.</td>
-            <td width="60%">Penjualan Koperasi Harian (Jajan/ATK)</td>
-            <td width="35%" class="duit"><?= formatRp($rev_koperasi) ?></td>
-        </tr>
-        <?php if($inc_seragam): ?>
-        <tr>
-            <td class="center">2.</td>
-            <td>Penjualan Seragam Sekolah</td>
-            <td class="duit"><?= formatRp($rev_seragam) ?></td>
-        </tr>
-        <?php endif; ?>
-        <?php if($inc_eskul): ?>
-        <tr>
-            <td class="center">3.</td>
-            <td>Penjualan Atribut Eskul</td>
-            <td class="duit"><?= formatRp($rev_eskul) ?></td>
-        </tr>
-        <?php endif; ?>
-        <tr class="highlight-row">
-            <td colspan="2" align="right">TOTAL UANG MASUK</td>
-            <td class="duit"><?= formatRp($total_pendapatan) ?></td>
-        </tr>
-
-        <tr><td colspan="3"></td></tr>
-
-        <tr><td colspan="3" class="sub-header">B. PENGGUNAAN DANA (PENGELUARAN)</td></tr>
-        <?php 
-        $no=1;
-        $map_beban = [
-            'belanja_stok' => 'Belanja Barang Dagangan (Kulakan)',
-            'gaji_staff' => 'Gaji Penjaga / Staff',
-            'honor_pengurus' => 'Honor Pengurus Koperasi',
-            'dana_sosial' => 'Sumbangan / Dana Sosial',
-            'operasional_lain' => 'Listrik, Air, & ATK Kantor'
-        ];
-
-        foreach($list_beban as $kat => $val): 
-            $nama_beban = isset($map_beban[$kat]) ? $map_beban[$kat] : ucwords(str_replace('_', ' ', $kat));
-        ?>
-        <tr>
-            <td class="center"><?= $no++ ?>.</td>
-            <td><?= $nama_beban ?></td>
-            <td class="duit"><?= formatRp($val) ?></td>
-        </tr>
-        <?php endforeach; ?>
-        <tr class="highlight-row">
-            <td colspan="2" align="right">TOTAL PENGELUARAN</td>
-            <td class="duit" style="color:red;"><?= formatRp($total_beban) ?></td>
-        </tr>
-    </table>
-
-    <br><br>
-
-    <table border="1" width="100%">
-        <tr><th colspan="3" class="box-header">III. POSISI KEKAYAAN KOPERASI (HARTA & HUTANG)</th></tr>
-        
-        <tr><td colspan="3" class="sub-header">A. HARTA KITA (APA YANG KITA PUNYA)</td></tr>
-        <tr>
-            <td class="center">1.</td>
-            <td><b>Uang Tunai</b> (Siap Pakai)</td>
-            <td class="duit"><?= formatRp($uang_tunai) ?></td>
-        </tr>
-        <tr>
-            <td class="center">2.</td>
-            <td><b>Stok Barang</b> (Nilai Modal Barang di Gudang)</td>
-            <td class="duit"><?= formatRp($total_stok) ?></td>
-        </tr>
-        <tr>
-            <td class="center">3.</td>
-            <td><b>Piutang</b> (Uang Kita yang Belum Dibayar Siswa)</td>
-            <td class="duit"><?= formatRp($total_piutang) ?></td>
-        </tr>
-        <tr class="highlight-row">
-            <td colspan="2" align="right">TOTAL NILAI HARTA</td>
-            <td class="duit"><?= formatRp($total_harta) ?></td>
-        </tr>
-
-        <tr><td colspan="3"></td></tr>
-
-        <tr><td colspan="3" class="sub-header">B. KEWAJIBAN (DANA MILIK ORANG LAIN)</td></tr>
-        <tr>
-            <td class="center">1.</td>
-            <td><b>Tabungan Anggota</b> (Wajib dikembalikan jika diminta)</td>
-            <td class="duit"><?= formatRp($total_tabungan) ?></td>
-        </tr>
-        <tr>
-            <td class="center">2.</td>
-            <td><b>Titipan Guru</b> (Barang konsinyasi yang laku)</td>
-            <td class="duit"><?= formatRp($hutang_titipan) ?></td>
-        </tr>
-        <tr class="highlight-row">
-            <td colspan="2" align="right">TOTAL DANA ORANG LAIN</td>
-            <td class="duit"><?= formatRp($total_kewajiban) ?></td>
-        </tr>
-    </table>
-
-    <br><br>
-
-    <table border="1" width="100%">
-        <tr><th colspan="2" class="box-header" style="background-color: #c00000;">IV. ANALISIS KESEHATAN (PENTING)</th></tr>
-        
-        <tr>
-            <td width="30%" style="background-color: #f2f2f2; padding: 10px;">
-                <b>1. KONDISI KEAMANAN DANA</b>
-            </td>
-            <td width="70%" style="background-color: <?= $warna_uang ?>; padding: 10px; font-weight: bold;">
-                <?= $status_uang ?>
-            </td>
-        </tr>
-
-        <tr>
-            <td valign="top" style="padding: 10px; background-color: #f2f2f2;">
-                <b>2. TAGIHAN MACET TERBESAR</b><br>
-                <span class="ket">Mohon bantuan Wali Kelas untuk menagih.</span>
-            </td>
-            <td style="padding: 10px;">
-                <?php if(!empty($q_tunggakan)): ?>
-                    <table width="100%" border="0">
-                    <?php foreach($q_tunggakan as $t): ?>
-                        <tr>
-                            <td>- <?= $t['nama_siswa'] ?> (<?= $t['kelas'] ?>)</td>
-                            <td align="right" style="color:red; font-weight:bold;"><?= formatRp($t['sisa']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </table>
-                <?php else: ?>
-                    <i>Tidak ada tunggakan siswa.</i>
-                <?php endif; ?>
-            </td>
-        </tr>
-
-        <?php 
-        // Hitung Alokasi Sederhana
-        $dana_sekolah = $shu_periode * 0.40;
-        $dana_pengurus = $shu_periode * 0.30;
-        $dana_sosial = $shu_periode * 0.30;
-        ?>
-        <tr>
-            <td valign="top" style="padding: 10px; background-color: #f2f2f2;">
-                <b>3. ESTIMASI PEMBAGIAN KEUNTUNGAN</b><br>
-                <span class="ket">Jika dibagi sekarang (Sesuai kesepakatan).</span>
-            </td>
-            <td style="padding: 10px;">
-                <table width="100%" border="0">
-                    <tr><td>Untuk Kas Sekolah/Cadangan (40%)</td><td align="right"><?= formatRp($dana_sekolah) ?></td></tr>
-                    <tr><td>Jasa Pengurus & Karyawan (30%)</td><td align="right"><?= formatRp($dana_pengurus) ?></td></tr>
-                    <tr><td>Dana Sosial & Kegiatan (30%)</td><td align="right"><?= formatRp($dana_sosial) ?></td></tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-
-    <br><br>
-    <table border="0" width="100%">
-        <tr>
-            <td align="center" width="30%">
-                Mengetahui,<br>Kepala Sekolah
-                <br><br><br><br>
-                (___________________)
-            </td>
-            <td width="40%"></td>
-            <td align="center" width="30%">
-                <?= date('d F Y') ?><br>Bendahara Koperasi
-                <br><br><br><br>
-                (___________________)
-            </td>
-        </tr>
-    </table>
-
-    <?php
-    exit;
-} else {
-    echo "Metode request tidak valid.";
+// Cek Akses
+if(!isset($_SESSION['user']) || !isset($_POST['export_rapat'])){ 
+    die("Akses Ditolak."); 
 }
+
+// 1. AMBIL PENGATURAN SISTEM (PENTING UNTUK ALOKASI SHU)
+$set = getAllPengaturan($pdo);
+
+// 2. TANGKAP INPUT DARI FORM
+$bln_awal  = (int)$_POST['bulan_awal'];
+$bln_akhir = (int)$_POST['bulan_akhir'];
+$tahun     = (int)$_POST['tahun'];
+$tahun_lalu = $tahun - 1; // Untuk Komparasi
+$berita_acara = $_POST['berita_acara'] ?: 'Tidak ada catatan khusus dalam rapat ini.';
+
+// Filter Unit Usaha
+$inc_seragam = isset($_POST['inc_seragam']);
+$inc_eskul   = isset($_POST['inc_eskul']);
+
+// Setup Header Excel
+$nama_bln = [1=>"Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+$periode_teks = $nama_bln[$bln_awal] . " s.d " . $nama_bln[$bln_akhir] . " " . $tahun;
+$filename = "Laporan_RAT_Koperasi_Tahun_$tahun.xls";
+
+header("Content-Type: application/vnd.ms-excel");
+header("Content-Disposition: attachment; filename=\"$filename\"");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+// ==========================================================================
+// BAGIAN A: FUNGSI BANTUAN (HELPER)
+// ==========================================================================
+
+// Fungsi Hitung Pemasukan per Kategori & Tahun
+function getRevenue($pdo, $thn, $b1, $b2, $kategori) {
+    // PENTING: Kategori 'modal_awal' TIDAK diambil di sini karena kita sebutkan kategori spesifik
+    $sql = "SELECT SUM(jumlah) FROM transaksi_kas 
+            WHERE YEAR(tanggal) = ? AND MONTH(tanggal) BETWEEN ? AND ? 
+            AND kategori = ? AND arus = 'masuk'";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$thn, $b1, $b2, $kategori]);
+    return $stmt->fetchColumn() ?: 0;
+}
+
+// Fungsi Hitung Pengeluaran (Beban) per Tahun
+function getExpenseTotal($pdo, $thn, $b1, $b2) {
+    // Ambil semua arus keluar
+    $sql = "SELECT SUM(jumlah) FROM transaksi_kas 
+            WHERE YEAR(tanggal) = ? AND MONTH(tanggal) BETWEEN ? AND ? 
+            AND arus = 'keluar'";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$thn, $b1, $b2]);
+    return $stmt->fetchColumn() ?: 0;
+}
+
+// Fungsi Hitung Trend Persentase
+function calcTrend($sekarang, $lalu) {
+    if ($lalu <= 0) {
+        return ($sekarang > 0) ? "100%" : "0%";
+    }
+    $persen = (($sekarang - $lalu) / $lalu) * 100;
+    // Tambah tanda + jika positif
+    $sign = ($persen > 0) ? "+" : "";
+    return $sign . number_format($persen, 1) . "%";
+}
+
+// ==========================================================================
+// BAGIAN B: PERHITUNGAN DATA KEUANGAN (LOGIKA INTI)
+// ==========================================================================
+
+// --- 1. PENDAPATAN UNIT USAHA (Current vs Last Year) ---
+// a. Unit Toko (Harian + QRIS)
+$rev_toko_ini = getRevenue($pdo, $tahun, $bln_awal, $bln_akhir, 'penjualan_harian') 
+              + getRevenue($pdo, $tahun, $bln_awal, $bln_akhir, 'qris_masuk');
+$rev_toko_lalu = getRevenue($pdo, $tahun_lalu, $bln_awal, $bln_akhir, 'penjualan_harian')
+               + getRevenue($pdo, $tahun_lalu, $bln_awal, $bln_akhir, 'qris_masuk');
+
+// b. Unit Seragam
+$rev_srg_ini  = $inc_seragam ? getRevenue($pdo, $tahun, $bln_awal, $bln_akhir, 'penjualan_seragam') : 0;
+$rev_srg_lalu = $inc_seragam ? getRevenue($pdo, $tahun_lalu, $bln_awal, $bln_akhir, 'penjualan_seragam') : 0;
+
+// c. Unit Eskul
+$rev_esk_ini  = $inc_eskul ? getRevenue($pdo, $tahun, $bln_awal, $bln_akhir, 'penjualan_eskul') : 0;
+$rev_esk_lalu = $inc_eskul ? getRevenue($pdo, $tahun_lalu, $bln_awal, $bln_akhir, 'penjualan_eskul') : 0;
+
+// TOTAL PENDAPATAN
+$total_rev_ini  = $rev_toko_ini + $rev_srg_ini + $rev_esk_ini;
+$total_rev_lalu = $rev_toko_lalu + $rev_srg_lalu + $rev_esk_lalu;
+
+
+// --- 2. BEBAN OPERASIONAL (PENGELUARAN) ---
+// Rincian Beban Tahun Ini (Untuk Tabel Detail)
+$q_rincian = $pdo->prepare("SELECT kategori, SUM(jumlah) as total FROM transaksi_kas 
+                            WHERE YEAR(tanggal)=? AND MONTH(tanggal) BETWEEN ? AND ? 
+                            AND arus='keluar' GROUP BY kategori ORDER BY total DESC");
+$q_rincian->execute([$tahun, $bln_awal, $bln_akhir]);
+$detail_beban = $q_rincian->fetchAll(PDO::FETCH_ASSOC);
+
+// Total Beban
+$total_beban_ini  = getExpenseTotal($pdo, $tahun, $bln_awal, $bln_akhir);
+$total_beban_lalu = getExpenseTotal($pdo, $tahun_lalu, $bln_awal, $bln_akhir);
+
+
+// --- 3. SISA HASIL USAHA (LABA BERSIH) ---
+$shu_ini  = $total_rev_ini - $total_beban_ini;
+$shu_lalu = $total_rev_lalu - $total_beban_lalu;
+
+
+// --- 4. NERACA KEKAYAAN (POSISI HARTA & HUTANG) ---
+// A. HARTA (AKTIVA)
+// Uang Kas Fisik (Semua kategori masuk - keluar sampai hari ini)
+$kas_fisik = $pdo->query("SELECT SUM(CASE WHEN arus='masuk' THEN jumlah ELSE -jumlah END) FROM transaksi_kas")->fetchColumn() ?: 0;
+
+// Stok Barang (Nilai Aset)
+$stok_kop = $pdo->query("SELECT SUM(stok * harga_modal) FROM stok_koperasi")->fetchColumn() ?: 0;
+$stok_srg = $inc_seragam ? ($pdo->query("SELECT SUM(stok * harga_modal) FROM stok_sekolah")->fetchColumn() ?: 0) : 0;
+$stok_esk = $inc_eskul   ? ($pdo->query("SELECT SUM(stok * harga_modal) FROM stok_eskul")->fetchColumn() ?: 0)   : 0;
+$total_stok = $stok_kop + $stok_srg + $stok_esk;
+
+// Piutang (Cicilan Siswa Belum Lunas)
+$q_piutang = $pdo->query("SELECT SUM(sisa) FROM cicilan WHERE status='belum'")->fetchColumn() ?: 0;
+
+$total_harta = $kas_fisik + $total_stok + $q_piutang;
+
+// B. KEWAJIBAN (PASIVA)
+// Tabungan Anggota (Saldo Setor - Tarik)
+$total_tabungan = $pdo->query("SELECT SUM(CASE WHEN tipe_transaksi='setor' THEN jumlah ELSE -jumlah END) FROM simpanan")->fetchColumn() ?: 0;
+
+// Hutang Titipan (Konsinyasi laku tapi belum disetor ke Guru)
+$hutang_titipan = $pdo->query("SELECT SUM(stok_terjual * harga_modal) FROM titipan WHERE status_bayar='belum'")->fetchColumn() ?: 0;
+
+$total_kewajiban = $total_tabungan + $hutang_titipan;
+
+// C. MODAL BERSIH (EKUITAS)
+$modal_bersih = $total_harta - $total_kewajiban;
+
+
+// --- 5. ANALISIS DATA LAINNYA ---
+// Top 5 Penunggak (Bad Debt)
+$macet = $pdo->query("SELECT nama_siswa, kelas, sisa FROM cicilan WHERE sisa > 0 ORDER BY sisa DESC LIMIT 5")->fetchAll();
+
+// Status Likuiditas (Kesehatan Kas)
+$rasio_kas = ($total_kewajiban > 0) ? ($kas_fisik / $total_kewajiban) * 100 : 100;
+if($rasio_kas >= 100) { $status_dana = "SANGAT SEHAT (Dana Kas Cukup Bayar Semua Kewajiban)"; $color_dana = "#c6efce"; }
+elseif($rasio_kas >= 50){ $status_dana = "CUKUP (Sebagian Dana Tertanam di Stok/Piutang)"; $color_dana = "#ffeb9c"; }
+else { $status_dana = "WASPADA (Kas Menipis, Segera Tagih Piutang)"; $color_dana = "#ffc7ce"; }
+
+?>
+
+<style>
+    body { font-family: Arial, sans-serif; font-size: 12px; }
+    .title { font-size: 16px; font-weight: bold; text-align: center; }
+    .subtitle { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 20px; }
+    
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #000; padding: 5px 8px; }
+    
+    .bg-header { background-color: #1f4e78; color: white; font-weight: bold; text-align: center; }
+    .bg-sub { background-color: #bdd7ee; font-weight: bold; }
+    .bg-total { background-color: #ffffcc; font-weight: bold; }
+    
+    .duit { text-align: right; mso-number-format:"\#\,\#\#0"; }
+    .center { text-align: center; }
+    .text-red { color: red; }
+    .text-blue { color: blue; }
+    .text-green { color: green; }
+</style>
+
+<div class="title">LAPORAN PERTANGGUNGJAWABAN PENGURUS (RAT)</div>
+<div class="title">KOPERASI SEKOLAH DIGITAL</div>
+<div class="subtitle">Periode Laporan: <?= $periode_teks ?></div>
+
+<table>
+    <tr class="bg-header"><th colspan="5">I. RINGKASAN KINERJA (YEAR-ON-YEAR)</th></tr>
+    <tr class="bg-sub">
+        <td colspan="2">INDIKATOR UTAMA</td>
+        <td class="center">TAHUN <?= $tahun_lalu ?></td>
+        <td class="center">TAHUN <?= $tahun ?></td>
+        <td class="center">PERTUMBUHAN</td>
+    </tr>
+    <tr>
+        <td colspan="2">Total Pendapatan (Omzet)</td>
+        <td class="duit"><?= $total_rev_lalu ?></td>
+        <td class="duit"><?= $total_rev_ini ?></td>
+        <td class="center"><?= calcTrend($total_rev_ini, $total_rev_lalu) ?></td>
+    </tr>
+    <tr>
+        <td colspan="2">Sisa Hasil Usaha (Laba Bersih)</td>
+        <td class="duit"><?= $shu_lalu ?></td>
+        <td class="duit font-weight-bold"><?= $shu_ini ?></td>
+        <td class="center fw-bold"><?= calcTrend($shu_ini, $shu_lalu) ?></td>
+    </tr>
+    <tr>
+        <td colspan="2">Total Aset (Kekayaan)</td>
+        <td class="center">-</td>
+        <td class="duit text-blue"><?= $total_harta ?></td>
+        <td class="center">-</td>
+    </tr>
+</table>
+
+<table>
+    <tr class="bg-header"><th colspan="5">II. RINCIAN PENDAPATAN & BEBAN</th></tr>
+    
+    <tr class="bg-sub"><td colspan="5">A. PENDAPATAN UNIT USAHA</td></tr>
+    <tr>
+        <td width="5%" class="center">1.</td>
+        <td width="45%">Unit Toko (Harian & QRIS)</td>
+        <td width="15%" class="duit"><?= $rev_toko_lalu ?></td>
+        <td width="15%" class="duit"><?= $rev_toko_ini ?></td>
+        <td width="20%" class="center"><?= calcTrend($rev_toko_ini, $rev_toko_lalu) ?></td>
+    </tr>
+    <?php if($inc_seragam): ?>
+    <tr>
+        <td class="center">2.</td>
+        <td>Unit Seragam Sekolah</td>
+        <td class="duit"><?= $rev_srg_lalu ?></td>
+        <td class="duit"><?= $rev_srg_ini ?></td>
+        <td class="center"><?= calcTrend($rev_srg_ini, $rev_srg_lalu) ?></td>
+    </tr>
+    <?php endif; ?>
+    <?php if($inc_eskul): ?>
+    <tr>
+        <td class="center">3.</td>
+        <td>Unit Atribut Eskul</td>
+        <td class="duit"><?= $rev_esk_lalu ?></td>
+        <td class="duit"><?= $rev_esk_ini ?></td>
+        <td class="center"><?= calcTrend($rev_esk_ini, $rev_esk_lalu) ?></td>
+    </tr>
+    <?php endif; ?>
+    <tr class="bg-total">
+        <td colspan="2" align="right">TOTAL PENDAPATAN</td>
+        <td class="duit"><?= $total_rev_lalu ?></td>
+        <td class="duit"><?= $total_rev_ini ?></td>
+        <td class="center"><?= calcTrend($total_rev_ini, $total_rev_lalu) ?></td>
+    </tr>
+
+    <tr><td colspan="5"></td></tr>
+
+    <tr class="bg-sub"><td colspan="5">B. RINCIAN BEBAN OPERASIONAL (TAHUN <?= $tahun ?>)</td></tr>
+    <?php 
+    $no=1; 
+    // Mapping nama beban agar lebih rapi
+    $map_beban = [
+        'belanja_stok' => 'Belanja Stok Barang (HPP)',
+        'gaji_staff' => 'Honor/Gaji Karyawan',
+        'biaya_operasional' => 'Listrik, Air & Internet',
+        'dana_sosial' => 'Sumbangan Sosial/Kematian',
+        'biaya_atk' => 'Perlengkapan Kantor (ATK)'
+    ];
+
+    foreach($detail_beban as $row): 
+        $nama = isset($map_beban[$row['kategori']]) ? $map_beban[$row['kategori']] : ucwords(str_replace('_',' ',$row['kategori']));
+    ?>
+    <tr>
+        <td class="center"><?= $no++ ?>.</td>
+        <td colspan="2"><?= $nama ?></td>
+        <td class="duit"><?= $row['total'] ?></td>
+        <td class="center">-</td>
+    </tr>
+    <?php endforeach; ?>
+    <tr class="bg-total">
+        <td colspan="3" align="right">TOTAL BEBAN</td>
+        <td class="duit text-red"><?= $total_beban_ini ?></td>
+        <td class="center"><?= calcTrend($total_beban_ini, $total_beban_lalu) ?></td>
+    </tr>
+
+    <tr><td colspan="5"></td></tr>
+    <tr style="background-color: #2e7d32; color: white; font-weight: bold;">
+        <td colspan="3" align="right">SISA HASIL USAHA (SHU) BERSIH</td>
+        <td class="duit"><?= $shu_ini ?></td>
+        <td class="center"><?= calcTrend($shu_ini, $shu_lalu) ?></td>
+    </tr>
+</table>
+
+<table>
+    <tr class="bg-header"><th colspan="4">III. NERACA & KESEHATAN KEUANGAN (Per <?= date('d-m-Y') ?>)</th></tr>
+    
+    <tr>
+        <td colspan="2" class="bg-sub center">AKTIVA (HARTA)</td>
+        <td colspan="2" class="bg-sub center">PASIVA (KEWAJIBAN & MODAL)</td>
+    </tr>
+    <tr>
+        <td>1. Kas Tunai & Bank</td>
+        <td class="duit"><?= $kas_fisik ?></td>
+        <td>1. Tabungan Anggota</td>
+        <td class="duit"><?= $total_tabungan ?></td>
+    </tr>
+    <tr>
+        <td>2. Persediaan Barang (Stok)</td>
+        <td class="duit"><?= $total_stok ?></td>
+        <td>2. Hutang Titipan (Konsinyasi)</td>
+        <td class="duit"><?= $hutang_titipan ?></td>
+    </tr>
+    <tr>
+        <td>3. Piutang Usaha (Cicilan)</td>
+        <td class="duit"><?= $q_piutang ?></td>
+        <td class="text-blue fw-bold">3. Modal Bersih (Ekuitas)</td>
+        <td class="duit text-blue fw-bold"><?= $modal_bersih ?></td>
+    </tr>
+    <tr class="bg-total">
+        <td>TOTAL AKTIVA</td>
+        <td class="duit"><?= $total_harta ?></td>
+        <td>TOTAL PASIVA</td>
+        <td class="duit"><?= $total_kewajiban + $modal_bersih ?></td>
+    </tr>
+</table>
+
+<table>
+    <tr class="bg-header"><th colspan="3">IV. ANALISIS MANAJEMEN & ALOKASI PROFIT</th></tr>
+    
+    <tr>
+        <td width="30%" class="bg-sub">1. KESEHATAN KAS (LIKUIDITAS)</td>
+        <td colspan="2" style="background-color: <?= $color_dana ?>; font-weight: bold; text-align: center;">
+            <?= $status_dana ?> (Rasio: <?= number_format($rasio_kas, 1) ?>%)
+        </td>
+    </tr>
+    
+    <tr>
+        <td class="bg-sub" valign="top">2. DATA TUNGGAKAN (Top 5)</td>
+        <td colspan="2">
+            <?php if($macet): ?>
+                <ul style="margin: 0; padding-left: 20px;">
+                <?php foreach($macet as $m): ?>
+                    <li><?= $m['nama_siswa'] ?> (<?= $m['kelas'] ?>): <span class="text-red fw-bold">Rp <?= number_format($m['sisa']) ?></span></li>
+                <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <i>Tidak ada tunggakan pembayaran.</i>
+            <?php endif; ?>
+        </td>
+    </tr>
+
+    <tr>
+        <td class="bg-sub" valign="top">3. PEMBAGIAN SHU (Estimasi)</td>
+        <td colspan="2">
+            <table style="width: 100%; border: none; margin: 0;">
+                <tr>
+                    <td style="border:none;">- Cadangan Kas (<?= $set['persen_kas'] ?>%)</td>
+                    <td style="border:none;" class="duit"><?= $shu_ini * ($set['persen_kas']/100) ?></td>
+                </tr>
+                <tr>
+                    <td style="border:none;">- Jasa Pengurus (<?= $set['persen_pengurus'] ?>%)</td>
+                    <td style="border:none;" class="duit"><?= $shu_ini * ($set['persen_pengurus']/100) ?></td>
+                </tr>
+                <tr>
+                    <td style="border:none;">- Jasa Anggota/Staff (<?= $set['persen_staff'] ?>%)</td>
+                    <td style="border:none;" class="duit"><?= $shu_ini * ($set['persen_staff']/100) ?></td>
+                </tr>
+                <tr>
+                    <td style="border:none;">- Dana Sosial (<?= $set['persen_dansos'] ?>%)</td>
+                    <td style="border:none;" class="duit"><?= $shu_ini * ($set['persen_dansos']/100) ?></td>
+                </tr>
+                <tr>
+                    <td style="border:none;">- Jasa Pembina (<?= $set['persen_pembina'] ?>%)</td>
+                    <td style="border:none;" class="duit"><?= $shu_ini * ($set['persen_pembina']/100) ?></td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<table>
+    <tr class="bg-header"><th style="background-color: #ed7d31; text-align: left;">V. CATATAN & KEPUTUSAN RAPAT (BERITA ACARA)</th></tr>
+    <tr>
+        <td style="height: 150px; vertical-align: top; padding: 15px; font-style: italic;">
+            <?= nl2br(htmlspecialchars($berita_acara)) ?>
+        </td>
+    </tr>
+</table>
+
+<br>
+
+<table style="border: none; margin-top: 30px;">
+    <tr>
+        <td width="33%" align="center" style="border: none;">
+            Mengetahui,<br>Kepala Sekolah
+            <br><br><br><br><br>
+            ( _______________________ )
+        </td>
+        <td width="33%" align="center" style="border: none;">
+            Mengesahkan,<br><b>Pengawas Koperasi</b>
+            <br><br><br><br><br>
+            ( _______________________ )
+        </td>
+        <td width="33%" align="center" style="border: none;">
+            <?= date('d F Y') ?><br>Bendahara Koperasi
+            <br><br><br><br><br>
+            ( _______________________ )
+        </td>
+    </tr>
+</table>
+
+<?php
+exit; // Selesai
+
 ?>

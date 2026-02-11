@@ -3,7 +3,7 @@
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
-// --- FILTER: HANYA KAS MURNI (Keluarkan Transaksi Seragam & Eskul dari Laporan ini) ---
+// --- FILTER: KELUARKAN MODAL AWAL DARI SURPLUS OPERASIONAL ---
 $sql = "SELECT * FROM transaksi_kas 
         WHERE (tanggal BETWEEN ? AND ?) 
         AND kategori NOT IN ('penjualan_seragam', 'penjualan_eskul') 
@@ -17,8 +17,14 @@ $total_masuk_periode = 0;
 $total_keluar_periode = 0;
 
 foreach($transaksi as $t){
-    if($t['arus'] == 'masuk') $total_masuk_periode += $t['jumlah'];
-    else $total_keluar_periode += $t['jumlah'];
+    // PERBAIKAN: Hitung Surplus tapi abaikan modal_awal agar angka "Keuntungan" akurat
+    if($t['arus'] == 'masuk') {
+        if($t['kategori'] != 'modal_awal') {
+            $total_masuk_periode += $t['jumlah'];
+        }
+    } else {
+        $total_keluar_periode += $t['jumlah'];
+    }
 }
 $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
 ?>
@@ -34,7 +40,7 @@ $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
     <div class="col-md-4">
         <div class="card bg-success text-white border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
             <div class="card-body p-4">
-                <h6 class="text-white-50 text-uppercase small fw-bold mb-2">Total Pemasukan</h6>
+                <h6 class="text-white-50 text-uppercase small fw-bold mb-2">Pemasukan Operasional</h6>
                 <h3 class="mb-0 fw-bold"><?= formatRp($total_masuk_periode) ?></h3>
             </div>
             <i class="fas fa-arrow-down fa-4x position-absolute bottom-0 end-0 mb-n1 me-3 opacity-25"></i>
@@ -52,7 +58,7 @@ $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
     <div class="col-md-4">
         <div class="card bg-primary text-white border-0 shadow-sm rounded-4 h-100 position-relative overflow-hidden">
             <div class="card-body p-4">
-                <h6 class="text-white-50 text-uppercase small fw-bold mb-2">Surplus / Defisit</h6>
+                <h6 class="text-white-50 text-uppercase small fw-bold mb-2">Laba Bersih Operasional</h6>
                 <h3 class="mb-0 fw-bold"><?= formatRp($saldo_akhir_periode) ?></h3>
             </div>
             <i class="fas fa-wallet fa-4x position-absolute bottom-0 end-0 mb-n1 me-3 opacity-25"></i>
@@ -64,15 +70,10 @@ $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
     <div class="card-body p-3">
         <form class="row g-2 align-items-center" method="GET">
             <input type="hidden" name="page" value="kas/laporan_kas">
-            <div class="col-auto"><span class="fw-bold text-muted small me-2">FILTER:</span></div>
             <div class="col-auto"><input type="date" name="tgl_awal" class="form-control form-control-sm" value="<?= $tgl_awal ?>"></div>
             <div class="col-auto text-muted small">s/d</div>
             <div class="col-auto"><input type="date" name="tgl_akhir" class="form-control form-control-sm" value="<?= $tgl_akhir ?>"></div>
             <div class="col-auto"><button type="submit" class="btn btn-sm btn-dark px-3 rounded-pill fw-bold">Terapkan</button></div>
-            <div class="col-auto ms-auto">
-                <a href="process/export_laporan_kas.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" class="btn btn-sm btn-success rounded-pill px-3" target="_blank"><i class="fas fa-file-excel me-1"></i> Excel</a>
-                <a href="pages/kas/cetak_laporan_kas.php?tgl_awal=<?= $tgl_awal ?>&tgl_akhir=<?= $tgl_akhir ?>" class="btn btn-sm btn-secondary rounded-pill px-3" target="_blank"><i class="fas fa-print me-1"></i> Print</a>
-            </div>
         </form>
     </div>
 </div>
