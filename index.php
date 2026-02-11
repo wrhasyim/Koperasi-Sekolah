@@ -3,6 +3,12 @@ session_start();
 require_once 'config/database.php';
 require_once 'config/functions.php';
 
+// [PERBAIKAN] HANDLER LOGOUT (Harus diletakkan sebelum output HTML)
+if (isset($_GET['page']) && $_GET['page'] == 'logout') {
+    include 'process/auth_logout.php';
+    exit; // Hentikan script agar tidak lanjut render HTML
+}
+
 cekLogin();
 $user = $_SESSION['user'];
 $role = $user['role'];
@@ -293,9 +299,9 @@ $base_url = "$protocol://$host$path/";
 
             // Cek apakah halaman diminta ada di whitelist
             if(in_array($page, $allowed_pages)){
-                // Handle Logout Khusus
+                // Handle Logout Khusus (Sudah di-handle di atas, tapi disimpan untuk jaga-jaga)
                 if($page == 'logout'){
-                    include 'process/auth_logout.php';
+                    // Harusnya tidak sampai sini karena sudah exit di atas
                     exit;
                 }
 
