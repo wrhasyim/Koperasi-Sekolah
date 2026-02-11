@@ -1,5 +1,7 @@
 <?php
-$stmt = $pdo->query("SELECT * FROM anggota ORDER BY nama_lengkap ASC");
+// pages/data_anggota.php
+// PERBAIKAN: Menambahkan filter role != 'admin' agar admin tidak muncul di daftar anggota
+$stmt = $pdo->query("SELECT * FROM anggota WHERE role != 'admin' ORDER BY nama_lengkap ASC");
 $anggota = $stmt->fetchAll();
 $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
 ?>
@@ -35,7 +37,7 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
             <tbody>
                 <?php foreach($anggota as $row): 
                     $bg_color = $colors[$row['id'] % count($colors)];
-                    $initial = strtoupper(substr($row['nama_lengkap'], 0, 1));
+                    $initial = strtoupper(substr($row['nama_lengkap'] ?? 'A', 0, 1));
                 ?>
                 <tr>
                     <td class="ps-4">
@@ -51,8 +53,7 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
                     </td>
                     <td>
                         <?php 
-                        if($row['role']=='admin') echo '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3 py-2 rounded-pill">ADMIN SYSTEM</span>';
-                        elseif($row['role']=='staff') echo '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-3 py-2 rounded-pill">STAFF (DAVID)</span>';
+                        if($row['role']=='staff') echo '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-3 py-2 rounded-pill">STAFF</span>';
                         elseif($row['role']=='pengurus') echo '<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-3 py-2 rounded-pill">PENGURUS</span>';
                         else echo '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-3 py-2 rounded-pill">GURU</span>'; 
                         ?>
@@ -98,7 +99,6 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
                                                 <option value="guru" <?= $row['role']=='guru'?'selected':'' ?>>Guru</option>
                                                 <option value="staff" <?= $row['role']=='staff'?'selected':'' ?>>Staff</option>
                                                 <option value="pengurus" <?= $row['role']=='pengurus'?'selected':'' ?>>Pengurus</option>
-                                                <option value="admin" <?= $row['role']=='admin'?'selected':'' ?>>Admin</option>
                                             </select>
                                         </div>
                                         <div class="col-6 mb-3">
@@ -156,7 +156,6 @@ $colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
                                 <option value="guru">Guru</option>
                                 <option value="staff">Staff</option>
                                 <option value="pengurus">Pengurus</option>
-                                <option value="admin">Admin</option>
                             </select>
                         </div>
                     </div>

@@ -24,12 +24,27 @@ function cekLogin(){
     }
 }
 
-// --- LOG SYSTEM ---
+// --- [UPGRADE] LOG SYSTEM (AUDIT TRAIL) ---
+// Fungsi ini sekarang mencatat IP dan Role juga
 function catatLog($pdo, $user_id, $aksi, $keterangan){
     try {
-        $stmt = $pdo->prepare("INSERT INTO log_aktivitas (user_id, aksi, keterangan) VALUES (?, ?, ?)");
-        $stmt->execute([$user_id, $aksi, $keterangan]);
-    } catch (Exception $e) {}
+        // 1. Ambil Role User saat ini
+        $stmt = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $role = $stmt->fetchColumn() ?: 'unknown';
+
+        // 2. Ambil IP Address
+        $ip = $_SERVER['REMOTE_ADDR'];
+
+        // 3. Simpan ke Database
+        $sql = "INSERT INTO log_aktivitas (user_id, role, aksi, keterangan, ip_address, created_at) 
+                VALUES (?, ?, ?, ?, ?, NOW())";
+        $stmt_insert = $pdo->prepare($sql);
+        $stmt_insert->execute([$user_id, $role, $aksi, $keterangan, $ip]);
+        
+    } catch (Exception $e) {
+        // Silent error: Jangan sampai gagal log bikin error transaksi utama
+    }
 }
 
 // --- UTILITIES ---
@@ -84,7 +99,7 @@ function getAllPengaturan($pdo) {
     return $stmt->fetchAll(PDO::FETCH_KEY_PAIR); 
 }
 
-// --- [DIPERBAIKI] HELPER NAMA ANGGOTA ---
+// --- HELPER NAMA ANGGOTA ---
 function getNamaAnggota($pdo, $id){
     if(!$id) return '-';
     $stmt = $pdo->prepare("SELECT nama_lengkap FROM anggota WHERE id = ?");

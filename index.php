@@ -227,6 +227,9 @@ $base_url = "$protocol://$host$path/";
             <a href="utilitas/riwayat_tutup_buku" class="nav-link <?= $page=='utilitas/riwayat_tutup_buku'?'active':'' ?>">
                 <i class="fas fa-fw fa-history"></i> <span>Riwayat Tutup Buku</span>
             </a>
+            <a href="utilitas/log_aktivitas" class="nav-link <?= $page=='utilitas/log_aktivitas'?'active':'' ?>">
+                <i class="fas fa-user-secret"></i> <span>Log Aktivitas</span>
+            </a>
         <?php endif; ?>
 
         <div class="mt-4 pb-5 px-3">
@@ -292,6 +295,7 @@ $base_url = "$protocol://$host$path/";
                 'utilitas/import_data',
                 'utilitas/backup',
                 'utilitas/riwayat_tutup_buku',
+                'utilitas/log_aktivitas', // Menu Baru
                 
                 // Logout
                 'logout'
