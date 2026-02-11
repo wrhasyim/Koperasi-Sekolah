@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 11, 2026 at 02:02 AM
+-- Generation Time: Feb 11, 2026 at 05:39 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -108,12 +108,19 @@ CREATE TABLE `kasbon` (
   `id` int(11) NOT NULL,
   `anggota_id` int(11) NOT NULL,
   `tanggal_pinjam` date NOT NULL,
-  `jumlah_pinjam` decimal(15,2) NOT NULL,
+  `total_belanja` decimal(15,2) NOT NULL,
   `sisa_pinjaman` decimal(15,2) NOT NULL,
   `keterangan` text DEFAULT NULL,
   `status` enum('lunas','belum') DEFAULT 'belum',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `kasbon`
+--
+
+INSERT INTO `kasbon` (`id`, `anggota_id`, `tanggal_pinjam`, `total_belanja`, `sisa_pinjaman`, `keterangan`, `status`, `created_at`) VALUES
+(1, 3, '2026-02-11', 40000.00, 40000.00, 'Air Mineral Gelas (x40)', 'belum', '2026-02-11 04:15:52');
 
 -- --------------------------------------------------------
 
@@ -176,6 +183,13 @@ CREATE TABLE `pinjaman_dana` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `pinjaman_dana`
+--
+
+INSERT INTO `pinjaman_dana` (`id`, `anggota_id`, `tanggal_pinjam`, `jumlah_pinjam`, `bunga_persen`, `nominal_bunga`, `total_tagihan`, `sisa_tagihan`, `keterangan`, `status`, `created_at`) VALUES
+(2, 3, '2026-02-11', 20000000.00, 2.00, 400000.00, 20400000.00, 0.00, '', 'lunas', '2026-02-11 01:17:28');
+
 -- --------------------------------------------------------
 
 --
@@ -207,6 +221,14 @@ CREATE TABLE `riwayat_bayar_pinjaman` (
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `riwayat_bayar_pinjaman`
+--
+
+INSERT INTO `riwayat_bayar_pinjaman` (`id`, `pinjaman_id`, `tanggal_bayar`, `jumlah_bayar`, `sisa_akhir`, `user_id`, `created_at`) VALUES
+(1, 2, '2026-02-11', 400000.00, 20000000.00, 1, '2026-02-11 01:21:16'),
+(2, 2, '2026-02-11', 20000000.00, 0.00, 1, '2026-02-11 01:26:37');
 
 -- --------------------------------------------------------
 
@@ -253,7 +275,10 @@ INSERT INTO `simpanan` (`id`, `anggota_id`, `tanggal`, `jenis_simpanan`, `jumlah
 (3, 3, '2026-02-10', 'hari_raya', 100000.00, 'setor', 'Tabungan Lebaran', '2026-02-10 08:35:29'),
 (4, 4, '2026-02-10', 'pokok', 50000.00, 'setor', 'Simpanan Pokok Pak Budi', '2026-02-10 08:35:29'),
 (5, 4, '2026-02-10', 'hari_raya', 200000.00, 'setor', 'Tabungan Lebaran', '2026-02-10 08:35:29'),
-(6, 4, '2026-02-09', 'hari_raya', 50000.00, 'tarik', 'Ambil sebagian', '2026-02-10 08:35:29');
+(6, 4, '2026-02-09', 'hari_raya', 50000.00, 'tarik', 'Ambil sebagian', '2026-02-10 08:35:29'),
+(7, 3, '2026-02-11', 'hari_raya', 20000.00, 'setor', '', '2026-02-11 03:52:30'),
+(8, 3, '2026-02-11', 'wajib', 25000.00, 'setor', '', '2026-02-11 03:52:41'),
+(9, 5, '2026-02-11', 'pokok', 100000.00, 'setor', 'Simpanan Pokok Awal', '2026-02-11 03:52:47');
 
 -- --------------------------------------------------------
 
@@ -327,7 +352,7 @@ CREATE TABLE `stok_koperasi` (
 INSERT INTO `stok_koperasi` (`id`, `nama_barang`, `harga_modal`, `harga_jual`, `stok`, `updated_at`) VALUES
 (1, 'Pulpen Standard', 2000.00, 3000.00, 50, '2026-02-10 08:35:29'),
 (2, 'Buku Tulis Sinar Dunia 38', 3500.00, 5000.00, 100, '2026-02-10 08:35:29'),
-(3, 'Air Mineral Gelas', 500.00, 1000.00, 48, '2026-02-10 08:35:29'),
+(3, 'Air Mineral Gelas', 500.00, 1000.00, 8, '2026-02-11 04:15:52'),
 (4, 'Keripik Singkong Pedas', 4000.00, 5000.00, 20, '2026-02-10 08:35:29'),
 (5, 'Pensil 2B Faber Castell', 3000.00, 4500.00, 30, '2026-02-10 08:35:29');
 
@@ -421,7 +446,15 @@ INSERT INTO `transaksi_kas` (`id`, `tanggal`, `kategori`, `arus`, `jumlah`, `ket
 (13, '2026-02-10', 'qris_masuk', 'masuk', 150.00, 'p', 1, '2026-02-10 09:09:22'),
 (14, '2026-02-10', 'bagi_hasil_pengurus', 'keluar', 739147.50, 'Pembayaran Honor/Jatah Pengurus (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:32:04'),
 (15, '2026-02-10', 'bagi_hasil_staff', 'keluar', 246382.50, 'Pembayaran Honor/Jatah Staff (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:34:43'),
-(16, '2026-02-11', 'bagi_hasil_pengurus', 'keluar', 739147.50, 'Pembayaran Honor/Jatah Pengurus (Periode: 2026-02-01 s/d 2026-02-11)', 1, '2026-02-11 00:59:28');
+(16, '2026-02-11', 'bagi_hasil_pengurus', 'keluar', 739147.50, 'Pembayaran Honor/Jatah Pengurus (Periode: 2026-02-01 s/d 2026-02-11)', 1, '2026-02-11 00:59:28'),
+(17, '2026-02-11', 'pinjaman_anggota', 'keluar', 20000000.00, 'Pencairan Pinjaman: Bu Guru Ani', 1, '2026-02-11 01:17:28'),
+(18, '2026-02-11', 'bayar_pinjaman', 'masuk', 400000.00, 'Cicilan Pinjaman: Bu Guru Ani', 1, '2026-02-11 01:21:16'),
+(19, '2026-02-11', 'bayar_pinjaman', 'masuk', 20000000.00, 'Cicilan Pinjaman: Bu Guru Ani', 1, '2026-02-11 01:26:37'),
+(20, '2026-02-11', 'simpanan_masuk', 'masuk', 20000.00, 'Setor Sihara: Bu Guru Ani ()', 1, '2026-02-11 03:52:30'),
+(21, '2026-02-11', 'simpanan_masuk', 'masuk', 25000.00, 'Setor Simjib: Bu Guru Ani ()', 1, '2026-02-11 03:52:41'),
+(22, '2026-02-11', 'simpanan_masuk', 'masuk', 100000.00, 'Setor Simpok: Siti Pengurus', 1, '2026-02-11 03:52:47'),
+(23, '2026-02-11', 'bagi_hasil_dansos', 'keluar', 492765.00, 'Pembayaran Akumulasi Dana Sosial (Realisasi Bulan: February 2026)', 1, '2026-02-11 04:15:23'),
+(24, '2026-02-11', 'bagi_hasil_pembina', 'keluar', 246382.50, 'Pembayaran Akumulasi Pembina (Realisasi Bulan: February 2026)', 1, '2026-02-11 04:15:25');
 
 -- --------------------------------------------------------
 
@@ -587,7 +620,7 @@ ALTER TABLE `hutang_jajan`
 -- AUTO_INCREMENT for table `kasbon`
 --
 ALTER TABLE `kasbon`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `log_aktivitas`
@@ -599,7 +632,7 @@ ALTER TABLE `log_aktivitas`
 -- AUTO_INCREMENT for table `pinjaman_dana`
 --
 ALTER TABLE `pinjaman_dana`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `riwayat_bayar_kasbon`
@@ -611,7 +644,7 @@ ALTER TABLE `riwayat_bayar_kasbon`
 -- AUTO_INCREMENT for table `riwayat_bayar_pinjaman`
 --
 ALTER TABLE `riwayat_bayar_pinjaman`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `riwayat_pengambilan`
@@ -623,7 +656,7 @@ ALTER TABLE `riwayat_pengambilan`
 -- AUTO_INCREMENT for table `simpanan`
 --
 ALTER TABLE `simpanan`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `stok_barang`
@@ -659,7 +692,7 @@ ALTER TABLE `titipan`
 -- AUTO_INCREMENT for table `transaksi_kas`
 --
 ALTER TABLE `transaksi_kas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `tutup_buku`
