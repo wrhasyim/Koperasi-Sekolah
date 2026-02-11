@@ -25,7 +25,7 @@ if($_SESSION['user']['role'] == 'staff') {
     // 3. Hitung Titipan Belum Bayar (Pending)
     $titipan = 0;
     try {
-        // PERBAIKAN: Menggunakan kolom 'status_bayar'
+        // Menggunakan kolom 'status_bayar' sesuai database Anda
         $titipan = $pdo->query("SELECT COUNT(*) FROM titipan WHERE status_bayar = 'belum'")->fetchColumn();
     } catch(Exception $e){}
 ?>
@@ -98,15 +98,15 @@ if($_SESSION['user']['role'] == 'staff') {
 
     // --- 2. HITUNG KEWAJIBAN / DANA MENGENDAP (Uang Orang Lain) ---
     
-    // a. Tabungan Siswa/Guru (PERBAIKAN QUERY: Hitung Setor - Tarik)
-    // Karena tabel simpanan adalah tabel transaksi, bukan tabel saldo.
+    // a. Tabungan Siswa/Guru (Rumus: Total Setor - Total Tarik)
+    // Karena tabel simpanan mencatat transaksi, bukan saldo akhir.
     $q_simp = $pdo->query("SELECT SUM(CASE WHEN tipe_transaksi = 'setor' THEN jumlah ELSE -jumlah END) as total FROM simpanan")->fetch();
     $total_tabungan = $q_simp['total'] ?? 0;
 
     // b. Hutang Titipan (Barang laku tapi uang belum disetor ke guru)
     $hutang_titipan = 0;
     try {
-        // PERBAIKAN QUERY: Gunakan 'harga_modal' dan 'status_bayar'
+        // Menggunakan 'harga_modal' dan 'status_bayar' sesuai struktur DB Anda
         $q_titip = $pdo->query("SELECT SUM(stok_terjual * harga_modal) as hutang FROM titipan WHERE status_bayar = 'belum'")->fetch();
         $hutang_titipan = $q_titip['hutang'] ?? 0;
     } catch(Exception $e){}
@@ -132,15 +132,15 @@ if($_SESSION['user']['role'] == 'staff') {
 
     // Cek Titipan
     try {
-        // PERBAIKAN QUERY: Gunakan 'status_bayar'
         $sql = "SELECT id, nama_barang as nama, 'Titipan' as jenis, (stok_awal - stok_terjual) as sisa FROM titipan WHERE (stok_awal - stok_terjual) <= $limit_stok AND status_bayar = 'belum'";
         $stok_menipis_list = array_merge($stok_menipis_list, $pdo->query($sql)->fetchAll());
     } catch (Exception $e) {}
 
     $total_alert = count($stok_menipis_list);
 
-    // Transaksi Terakhir
-    $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id DESC LIMIT 7")->fetchAll();
+    // --- 5. TRANSAKSI TERAKHIR (DENGAN LIMIT DINAMIS) ---
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 7; // Default 7
+    $recent_trx = $pdo->query("SELECT * FROM transaksi_kas ORDER BY tanggal DESC, id DESC LIMIT $limit")->fetchAll();
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -201,11 +201,22 @@ if($_SESSION['user']['role'] == 'staff') {
     <div class="col-lg-8">
         <div class="card h-100 border-0 shadow-sm rounded-4">
             <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold text-dark m-0"><i class="fas fa-exchange-alt me-2 text-primary"></i> Mutasi Kas Terakhir</h6>
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="fw-bold text-dark m-0"><i class="fas fa-exchange-alt me-2 text-primary"></i> Mutasi Kas Terakhir</h6>
+                    <form method="GET" class="d-inline-block">
+                        <input type="hidden" name="page" value="dashboard">
+                        <select name="limit" class="form-select form-select-sm py-0 px-2 fw-bold text-muted bg-light border-0" style="height: 25px; width: auto; font-size: 0.8rem;" onchange="this.form.submit()">
+                            <option value="5" <?= $limit==5?'selected':'' ?>>5</option>
+                            <option value="7" <?= $limit==7?'selected':'' ?>>7</option>
+                            <option value="15" <?= $limit==15?'selected':'' ?>>15</option>
+                            <option value="30" <?= $limit==30?'selected':'' ?>>30</option>
+                        </select>
+                    </form>
+                </div>
                 <a href="index.php?page=kas/laporan_kas" class="btn btn-sm btn-outline-primary rounded-pill px-3">Lihat Semua</a>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0 small">
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4">Tanggal</th>

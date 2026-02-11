@@ -1,76 +1,100 @@
 <?php
-// AMBIL DATA BARANG UTK DROPDOWN
+// pages/kas/kas_belanja.php
+require_once 'config/database.php';
+
+// AMBIL DATA BARANG
 $barang_toko = $pdo->query("SELECT * FROM stok_koperasi ORDER BY nama_barang ASC")->fetchAll();
 
-// --- LOGIKA SIMPAN PENGELUARAN & UPDATE STOK ---
+// --- LOGIKA SIMPAN ---
 if(isset($_POST['simpan_pengeluaran'])){
-    $tanggal    = $_POST['tanggal'];
-    $kategori   = $_POST['kategori']; 
-    $jumlah     = (float) str_replace('.', '', $_POST['jumlah']); // Hapus titik jika ada format ribuan
-    $keterangan = $_POST['keterangan'];
-    $link_stok  = isset($_POST['link_stok']) ? $_POST['link_stok'] : 'tidak';
-    
-    $user_id    = $_SESSION['user']['id'];
+    try {
+        $pdo->beginTransaction();
 
-    // Validasi Tutup Buku
-    if(cekStatusPeriode($pdo, $tanggal)){
-        setFlash('danger', 'Gagal! Periode transaksi tanggal tersebut sudah Tutup Buku.');
-    } elseif($jumlah <= 0){
-        setFlash('danger', 'Nominal pengeluaran harus lebih dari 0.');
-    } else {
-        try {
-            $pdo->beginTransaction();
+        $tanggal    = $_POST['tanggal'];
+        $kategori   = $_POST['kategori']; 
+        $keterangan = $_POST['keterangan'];
+        $user_id    = $_SESSION['user']['id'];
+        $total_nominal = 0;
 
-            // 1. Simpan Transaksi Kas (Uang Keluar)
-            $sql = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) 
-                    VALUES (?, ?, 'keluar', ?, ?, ?)";
-            $pdo->prepare($sql)->execute([$tanggal, $kategori, $jumlah, $keterangan, $user_id]);
+        // KASUS 1: BELANJA STOK (KULAKAN)
+        if($kategori == 'belanja_stok'){
+            $items  = $_POST['item_id'] ?? [];
+            $qtys   = $_POST['item_qty'] ?? [];
+            $prices = $_POST['item_price'] ?? []; // Total harga per baris
+            $detail_names = [];
 
-            // 2. Jika Link Stok Aktif -> Update Inventory
-            if($link_stok == 'ya' && $kategori == 'belanja_stok'){
-                $id_barang = $_POST['id_barang_stok'];
-                $qty_beli  = (int) $_POST['qty_beli'];
-                
-                if($qty_beli > 0){
-                    // Update Stok & Harga Modal (Opsional: Disini pakai update stok saja)
-                    $pdo->prepare("UPDATE stok_koperasi SET stok = stok + ? WHERE id = ?")
-                        ->execute([$qty_beli, $id_barang]);
-                    
-                    // Update Keterangan Log
-                    $nama_brg = "";
-                    foreach($barang_toko as $b) { if($b['id'] == $id_barang) $nama_brg = $b['nama_barang']; }
-                    
-                    catatLog($pdo, $user_id, 'Restock', "Belanja $nama_brg sebanyak $qty_beli pcs via Kas Belanja.");
+            if(empty($items)){ throw new Exception("Belum ada barang yang dipilih!"); }
+
+            for($i = 0; $i < count($items); $i++){
+                $id_brg = $items[$i];
+                $qty    = (int)$qtys[$i];
+                $subtotal = (float)str_replace('.', '', $prices[$i]);
+
+                if($qty > 0 && $subtotal > 0){
+                    $total_nominal += $subtotal;
+
+                    // --- LOGIKA AVERAGE HPP (DIBULATKAN) ---
+                    $cek_db = $pdo->prepare("SELECT stok, nama_barang, harga_modal FROM stok_koperasi WHERE id = ?");
+                    $cek_db->execute([$id_brg]);
+                    $data_db = $cek_db->fetch();
+
+                    $stok_lama = ($data_db['stok'] < 0) ? 0 : $data_db['stok']; // Guard stok minus
+                    $aset_lama = $stok_lama * $data_db['harga_modal'];
+                    $aset_baru = $subtotal;
+                    $stok_baru_calc = $stok_lama + $qty;
+
+                    // Hitung Average & Rounding (Pembulatan)
+                    if($stok_baru_calc > 0){
+                        $modal_final = round(($aset_lama + $aset_baru) / $stok_baru_calc); 
+                    } else {
+                        $modal_final = round($subtotal / $qty);
+                    }
+
+                    // Update Stok Real & Harga Modal
+                    $stok_real_update = $data_db['stok'] + $qty;
+                    $pdo->prepare("UPDATE stok_koperasi SET stok = ?, harga_modal = ? WHERE id = ?")
+                        ->execute([$stok_real_update, $modal_final, $id_brg]);
+
+                    $detail_names[] = $data_db['nama_barang'] . " (x$qty)";
                 }
             }
+            $keterangan_full = "Belanja Stok: " . implode(", ", $detail_names) . ". " . $keterangan;
 
-            // 3. Catat Log Umum
-            catatLog($pdo, $user_id, 'Pengeluaran', "Input pengeluaran: $keterangan (Rp " . number_format($jumlah) . ")");
-
-            $pdo->commit();
-            setFlash('success', 'Pengeluaran Berhasil Disimpan & Sinkron!');
-            echo "<script>window.location='index.php?page=kas/kas_belanja';</script>";
-
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            setFlash('danger', 'Error: ' . $e->getMessage());
+        // KASUS 2: BIAYA LAIN
+        } else {
+            $total_nominal = (float)str_replace('.', '', $_POST['jumlah_single']);
+            $keterangan_full = $keterangan;
         }
+
+        if($total_nominal <= 0){ throw new Exception("Nominal 0 rupiah."); }
+
+        // INSERT KAS
+        $sql = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) 
+                VALUES (?, ?, 'keluar', ?, ?, ?)";
+        $pdo->prepare($sql)->execute([$tanggal, $kategori, $total_nominal, $keterangan_full, $user_id]);
+
+        $pdo->commit();
+        echo "<script>alert('Transaksi Berhasil Disimpan!'); window.location='index.php?page=kas/kas_belanja';</script>";
+
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo "<script>alert('Gagal: " . $e->getMessage() . "');</script>";
     }
 }
 
-// History 10 Terakhir
-$riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE arus='keluar' ORDER BY tanggal DESC, id DESC LIMIT 10")->fetchAll();
+$limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+$riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE arus='keluar' ORDER BY tanggal DESC, id DESC LIMIT $limit")->fetchAll();
 ?>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+<div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Keuangan</h6>
-        <h1 class="h2 fw-bold">Input Pengeluaran Operasional</h1>
+        <h2 class="h3 fw-bold mb-0">Input Pengeluaran</h2>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-md-5">
+    <div class="col-lg-5">
         <div class="card shadow-lg border-0 rounded-4 mb-4">
             <div class="card-header bg-danger text-white py-3 rounded-top-4">
                 <h6 class="mb-0 fw-bold"><i class="fas fa-money-bill-wave me-2"></i> Form Uang Keluar</h6>
@@ -78,102 +102,103 @@ $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE arus='keluar' ORDER BY
             <div class="card-body p-4">
                 <form method="POST">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Tanggal Transaksi</label>
-                        <input type="date" name="tanggal" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                        <label class="form-label small fw-bold text-muted">Tanggal</label>
+                        <input type="date" name="tanggal" class="form-control fw-bold" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-muted">Jenis Pengeluaran</label>
-                        <select name="kategori" id="kategori" class="form-select" required onchange="toggleStok()">
+                        <select name="kategori" id="kategori" class="form-select fw-bold" required onchange="toggleForm()">
                             <option value="">-- Pilih Jenis --</option>
-                            <option value="belanja_stok">Belanja Barang Toko (Kulakan)</option>
-                            <option value="gaji_staff">Gaji Staff / Karyawan</option>
-                            <option value="honor_pengurus">Honor Pengurus</option>
-                            <option value="dana_sosial">Dana Sosial / Sumbangan</option>
+                            <option value="belanja_stok">Belanja Stok (Kulakan)</option>
                             <option value="biaya_operasional">Listrik / Air / Internet</option>
-                            <option value="operasional_lain">Lain-lain (ATK Kantor, dll)</option>
+                            <option value="operasional_lain">Lain-lain (ATK, Kebersihan)</option>
                         </select>
                     </div>
 
-                    <div id="area_stok" class="bg-warning bg-opacity-10 p-3 rounded-3 border border-warning mb-3" style="display:none;">
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="link_stok" value="ya" id="cekLinkStok" checked onchange="toggleInputStok()">
-                            <label class="form-check-label fw-bold text-dark small" for="cekLinkStok">Otomatis Tambah Stok?</label>
+                    <div id="area_stok" style="display:none;" class="mb-3 bg-light p-2 rounded border">
+                        <div class="alert alert-warning py-1 px-2 small mb-2"><i class="fas fa-info-circle"></i> Isi total harga beli per baris. HPP otomatis dihitung rata-rata.</div>
+                        <div id="container_items">
+                            <div class="row g-1 mb-2 item-row">
+                                <div class="col-5">
+                                    <select name="item_id[]" class="form-select form-select-sm" required>
+                                        <option value="">- Barang -</option>
+                                        <?php foreach($barang_toko as $b): ?>
+                                            <option value="<?= $b['id'] ?>"><?= $b['nama_barang'] ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-2">
+                                    <input type="number" name="item_qty[]" class="form-control form-control-sm" placeholder="Qty" min="1" required>
+                                </div>
+                                <div class="col-4">
+                                    <input type="number" name="item_price[]" class="form-control form-control-sm" placeholder="Total Rp" required oninput="hitungTotal()">
+                                </div>
+                                <div class="col-1">
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="hapusBaris(this)" disabled><i class="fas fa-times"></i></button>
+                                </div>
+                            </div>
                         </div>
+                        <button type="button" class="btn btn-sm btn-warning w-100 fw-bold mt-2" onclick="tambahBaris()"><i class="fas fa-plus"></i> Tambah Baris Barang</button>
                         
-                        <div id="input_detail_stok">
-                            <div class="mb-2">
-                                <select name="id_barang_stok" class="form-select form-select-sm">
-                                    <option value="">-- Pilih Barang yg Dibeli --</option>
-                                    <?php foreach($barang_toko as $b): ?>
-                                        <option value="<?= $b['id'] ?>"><?= $b['nama_barang'] ?> (Sisa: <?= $b['stok'] ?>)</option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <div class="form-text small"><a href="inventory/stok_koperasi" class="text-decoration-none">Barang baru? Input di Inventory dulu.</a></div>
-                            </div>
-                            <div class="mb-0">
-                                <input type="number" name="qty_beli" class="form-control form-control-sm" placeholder="Jumlah Pcs (Qty)" min="1">
-                            </div>
+                        <div class="mt-2 text-end">
+                            <span class="small fw-bold text-muted">Total Bayar:</span>
+                            <span class="fw-bold text-danger fs-5" id="tampilan_total">Rp 0</span>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Nominal (Rp)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0 fw-bold">Rp</span>
-                            <input type="number" name="jumlah" class="form-control border-start-0" placeholder="0" required>
+                    <div id="area_single">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Nominal (Rp)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light fw-bold">Rp</span>
+                                <input type="number" name="jumlah_single" id="jumlah_single" class="form-control fw-bold" placeholder="0">
+                            </div>
                         </div>
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label small fw-bold text-muted">Rincian Keterangan</label>
-                        <textarea name="keterangan" class="form-control bg-light" rows="2" placeholder="Contoh: Beli Kopi 5 renceng, Gula 1kg" required></textarea>
+                        <label class="form-label small fw-bold text-muted">Keterangan</label>
+                        <textarea name="keterangan" class="form-control bg-light" rows="2" placeholder="Detail pengeluaran..." required></textarea>
                     </div>
                     
                     <button type="submit" name="simpan_pengeluaran" class="btn btn-danger w-100 py-2 fw-bold rounded-pill shadow-sm">
-                        <i class="fas fa-save me-2"></i> SIMPAN PENGELUARAN
+                        <i class="fas fa-save me-2"></i> SIMPAN TRANSAKSI
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="col-md-7">
+    <div class="col-lg-7">
         <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-header bg-white py-3 border-bottom">
-                <h6 class="mb-0 fw-bold text-muted"><i class="fas fa-history me-2"></i> 10 Transaksi Terakhir</h6>
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold text-muted"><i class="fas fa-history me-2"></i> Riwayat</h6>
+                <form method="GET" class="d-inline-block">
+                    <input type="hidden" name="page" value="kas/kas_belanja">
+                    <select name="limit" class="form-select form-select-sm py-0 bg-light border-0" onchange="this.form.submit()">
+                        <option value="10" <?= $limit==10?'selected':'' ?>>10</option>
+                        <option value="25" <?= $limit==25?'selected':'' ?>>25</option>
+                        <option value="50" <?= $limit==50?'selected':'' ?>>50</option>
+                    </select>
+                </form>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0 small">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="ps-3">Tanggal</th>
-                                <th>Kategori</th>
-                                <th>Keterangan</th>
-                                <th class="text-end pe-3">Jumlah</th>
-                                <th></th>
-                            </tr>
-                        </thead>
+                        <thead class="bg-light"><tr><th class="ps-3">Tanggal</th><th>Ket</th><th class="text-end pe-3">Jumlah</th><th></th></tr></thead>
                         <tbody>
-                            <?php foreach($riwayat as $row): ?>
+                            <?php foreach($riwayat as $row): 
+                                $bg = ($row['kategori']=='belanja_stok') ? 'warning text-dark' : 'secondary';
+                            ?>
                             <tr>
                                 <td class="ps-3 fw-bold"><?= date('d/m/y', strtotime($row['tanggal'])) ?></td>
                                 <td>
-                                    <?php 
-                                        $kat = $row['kategori'];
-                                        $bg = 'secondary';
-                                        if($kat == 'belanja_stok') $bg = 'warning text-dark';
-                                        if($kat == 'gaji_staff') $bg = 'info text-white';
-                                        if($kat == 'honor_pengurus') $bg = 'primary';
-                                        echo "<span class='badge bg-$bg rounded-pill px-2'>".strtoupper(str_replace('_',' ',$kat))."</span>";
-                                    ?>
+                                    <span class='badge bg-<?= $bg ?> rounded-pill me-1'><?= strtoupper(str_replace('_',' ',$row['kategori'])) ?></span>
+                                    <?= htmlspecialchars($row['keterangan']) ?>
                                 </td>
-                                <td><?= htmlspecialchars($row['keterangan']) ?></td>
                                 <td class="text-end text-danger fw-bold pe-3">- <?= number_format($row['jumlah']) ?></td>
-                                <td class="text-end pe-3">
-                                    <a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=kas/kas_belanja" class="text-danger" onclick="return confirm('Hapus transaksi ini? Stok tidak akan berkurang otomatis (harus manual).')"><i class="fas fa-trash-alt"></i></a>
-                                </td>
+                                <td class="text-end pe-3"><a href="process/kas_hapus.php?id=<?= $row['id'] ?>&redirect=index.php?page=kas/kas_belanja" class="text-danger" onclick="return confirm('Hapus?')"><i class="fas fa-trash-alt"></i></a></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -184,20 +209,50 @@ $riwayat = $pdo->query("SELECT * FROM transaksi_kas WHERE arus='keluar' ORDER BY
     </div>
 </div>
 
+<template id="template_row">
+    <div class="row g-1 mb-2 item-row">
+        <div class="col-5">
+            <select name="item_id[]" class="form-select form-select-sm" required>
+                <option value="">- Barang -</option>
+                <?php foreach($barang_toko as $b): ?><option value="<?= $b['id'] ?>"><?= $b['nama_barang'] ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-2"><input type="number" name="item_qty[]" class="form-control form-control-sm" placeholder="Qty" min="1" required></div>
+        <div class="col-4"><input type="number" name="item_price[]" class="form-control form-control-sm" placeholder="Total Rp" required oninput="hitungTotal()"></div>
+        <div class="col-1"><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="hapusBaris(this)"><i class="fas fa-times"></i></button></div>
+    </div>
+</template>
+
 <script>
-function toggleStok() {
+function toggleForm() {
     var kat = document.getElementById("kategori").value;
-    var area = document.getElementById("area_stok");
+    var stok = document.getElementById("area_stok");
+    var single = document.getElementById("area_single");
+    var inputSingle = document.getElementById("jumlah_single");
+
     if(kat === "belanja_stok") {
-        area.style.display = "block";
+        stok.style.display = "block";
+        single.style.display = "none";
+        inputSingle.required = false;
+        document.querySelectorAll('#container_items input, #container_items select').forEach(el => el.required = true);
     } else {
-        area.style.display = "none";
+        stok.style.display = "none";
+        single.style.display = "block";
+        inputSingle.required = true;
+        document.querySelectorAll('#container_items input, #container_items select').forEach(el => el.required = false);
     }
 }
-
-function toggleInputStok() {
-    var cek = document.getElementById("cekLinkStok");
-    var input = document.getElementById("input_detail_stok");
-    input.style.display = cek.checked ? "block" : "none";
+function tambahBaris() {
+    document.getElementById("container_items").appendChild(document.getElementById("template_row").content.cloneNode(true));
 }
+function hapusBaris(btn) {
+    btn.closest('.item-row').remove();
+    hitungTotal();
+}
+function hitungTotal() {
+    var total = 0;
+    document.querySelectorAll('input[name="item_price[]"]').forEach(input => total += parseFloat(input.value) || 0);
+    document.getElementById("tampilan_total").innerText = "Rp " + new Intl.NumberFormat('id-ID').format(total);
+}
+toggleForm();
 </script>
