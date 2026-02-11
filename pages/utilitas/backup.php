@@ -1,79 +1,98 @@
 <?php
-// Pastikan hanya ADMIN yang bisa akses
-if($_SESSION['user']['role'] != 'admin'){
-    echo "<script>alert('Akses Ditolak!'); window.location='dashboard';</script>";
-    exit;
-}
-
-if(isset($_POST['backup_now'])){
-    // Konfigurasi Database
-    $host = 'localhost';
-    $user = 'root';
-    $pass = '';
-    $name = 'db_koperasi_sekolah';
-    
-    // Nama File Backup
-    $filename = $name . "_" . date("Y-m-d_H-i-s") . ".sql";
-    
-    // Header untuk Download File
-    header('Content-Type: text/plain');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    
-    // 1. DUMP STRUKTUR & DATA
-    $return = "-- BACKUP DATABASE KOPERASI SEKOLAH\n";
-    $return .= "-- Tanggal: " . date("d-M-Y H:i:s") . "\n\n";
-    
-    $pdo_backup = new PDO("mysql:host=$host;dbname=$name", $user, $pass);
-    $tables = array();
-    $result = $pdo_backup->query('SHOW TABLES');
-    while($row = $result->fetch(PDO::FETCH_NUM)){ $tables[] = $row[0]; }
-    
-    foreach($tables as $table){
-        $result = $pdo_backup->query('SELECT * FROM '.$table);
-        $num_fields = $result->columnCount();
-        
-        $return .= "DROP TABLE IF EXISTS ".$table.";";
-        $row2 = $pdo_backup->query('SHOW CREATE TABLE '.$table)->fetch(PDO::FETCH_NUM);
-        $return .= "\n\n".$row2[1].";\n\n";
-        
-        for ($i = 0; $i < $num_fields; $i++){
-            while($row = $result->fetch(PDO::FETCH_NUM)){
-                $return.= 'INSERT INTO '.$table.' VALUES(';
-                for($j=0; $j<$num_fields; $j++){
-                    $row[$j] = addslashes($row[$j]);
-                    $row[$j] = str_replace("\n","\\n",$row[$j]);
-                    if (isset($row[$j])) { $return.= '"'.$row[$j].'"' ; } else { $return.= '""'; }
-                    if ($j<($num_fields-1)) { $return.= ','; }
-                }
-                $return.= ");\n";
-            }
-        }
-        $return.="\n\n\n";
-    }
-    
-    echo $return;
-    exit;
+// pages/utilitas/backup.php
+if ($_SESSION['user']['role'] !== 'admin') {
+    echo "<script>location.href='index.php';</script>"; exit;
 }
 ?>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Backup Database</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h6 class="text-muted text-uppercase small ls-1 mb-1">Sistem Admin</h6>
+        <h2 class="h3 fw-bold mb-0 text-dark"><i class="fas fa-tools me-2 text-primary"></i> Pemeliharaan Sistem</h2>
+    </div>
 </div>
 
-<div class="alert alert-warning">
-    <i class="fas fa-exclamation-triangle"></i> <strong>Penting:</strong> Lakukan backup data secara berkala (misal: seminggu sekali) dan simpan file SQL di Google Drive atau Flashdisk.
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 text-center">
+            <div class="card-body p-4">
+                <div class="bg-primary bg-opacity-10 text-primary rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
+                    <i class="fas fa-download fa-2x"></i>
+                </div>
+                <h5 class="fw-bold">Backup</h5>
+                <p class="text-muted small">Download salinan database terbaru untuk berjaga-jaga.</p>
+                <a href="process/backup_db.php" class="btn btn-primary w-100 rounded-pill fw-bold">
+                    <i class="fas fa-file-download me-2"></i> Download SQL
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 text-center border-start border-5 border-success">
+            <div class="card-body p-4">
+                <div class="bg-success bg-opacity-10 text-success rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
+                    <i class="fas fa-upload fa-2x"></i>
+                </div>
+                <h5 class="fw-bold text-success">Restore</h5>
+                <p class="text-muted small">Unggah file .sql hasil backup untuk mengembalikan data.</p>
+                <button type="button" class="btn btn-success w-100 rounded-pill fw-bold" data-bs-toggle="modal" data-bs-target="#modalRestore">
+                    <i class="fas fa-file-import me-2"></i> Upload & Pulihkan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 text-center border-start border-5 border-danger">
+            <div class="card-body p-4">
+                <div class="bg-danger bg-opacity-10 text-danger rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
+                    <i class="fas fa-undo-alt fa-2x"></i>
+                </div>
+                <h5 class="fw-bold text-danger">Factory Reset</h5>
+                <p class="text-muted small">Hapus semua data & transaksi. Akun Admin TIDAK dihapus.</p>
+                <button type="button" class="btn btn-danger w-100 rounded-pill fw-bold" data-bs-toggle="modal" data-bs-target="#modalReset">
+                    <i class="fas fa-trash-restore me-2"></i> Kosongkan Data
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body text-center p-5">
-        <i class="fas fa-database fa-5x text-primary mb-4"></i>
-        <h4>Download Data Koperasi</h4>
-        <p class="text-muted mb-4">Semua data anggota, simpanan, kas, dan stok akan didownload dalam format .SQL</p>
-        
-        <form method="POST">
-            <button type="submit" name="backup_now" class="btn btn-lg btn-primary">
-                <i class="fas fa-download me-2"></i> Download Backup Sekarang
-            </button>
-        </form>
+<div class="modal fade" id="modalRestore" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <form action="process/restore_db.php" method="POST" enctype="multipart/form-data">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title fw-bold text-success">Restore Database</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
+                    <p class="text-secondary">Peringatan: Proses ini akan menimpa data yang ada saat ini dengan data dari file backup.</p>
+                    <input type="file" name="backup_file" class="form-control" accept=".sql" required>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" name="restore" class="btn btn-success rounded-pill px-4 fw-bold">Jalankan Restore</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReset" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-body p-5 text-center">
+                <i class="fas fa-radiation fa-4x text-danger mb-4"></i>
+                <h3 class="fw-bold text-dark">Hapus Semua Data?</h3>
+                <p class="text-secondary small">Data transaksi, tabungan, dan stok akan hilang permanen. <b>Akun Admin tetap bisa login.</b></p>
+                <div class="d-flex gap-2 mt-4">
+                    <button type="button" class="btn btn-light w-100 rounded-pill" data-bs-dismiss="modal">Batal</button>
+                    <a href="process/factory_reset.php" class="btn btn-danger w-100 rounded-pill fw-bold">Ya, Reset Sekarang</a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>

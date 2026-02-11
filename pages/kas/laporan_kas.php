@@ -3,17 +3,16 @@
 $tgl_awal = isset($_GET['tgl_awal']) ? $_GET['tgl_awal'] : date('Y-m-01');
 $tgl_akhir = isset($_GET['tgl_akhir']) ? $_GET['tgl_akhir'] : date('Y-m-d');
 
-// --- FILTER: HANYA KAS MURNI (Keluarkan Seragam & Eskul) ---
+// --- FILTER: HANYA KAS MURNI (Keluarkan Transaksi Seragam & Eskul dari Laporan ini) ---
 $sql = "SELECT * FROM transaksi_kas 
         WHERE (tanggal BETWEEN ? AND ?) 
         AND kategori NOT IN ('penjualan_seragam', 'penjualan_eskul') 
-        ORDER BY tanggal DESC, id DESC"; // Urutkan dari yang terbaru
+        ORDER BY tanggal DESC, id DESC";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$tgl_awal, $tgl_akhir]);
 $transaksi = $stmt->fetchAll();
 
-// --- HITUNG RINGKASAN ---
 $total_masuk_periode = 0;
 $total_keluar_periode = 0;
 
@@ -27,7 +26,7 @@ $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h6 class="text-muted text-uppercase small ls-1 mb-1">Laporan Keuangan</h6>
-        <h2 class="h3 fw-bold mb-0">Laporan Arus Kas Operasional</h2>
+        <h2 class="h3 fw-bold mb-0 text-dark">Laporan Arus Kas Operasional</h2>
     </div>
 </div>
 
@@ -79,45 +78,26 @@ $saldo_akhir_periode = $total_masuk_periode - $total_keluar_periode;
 </div>
 
 <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-    <div class="card-header bg-white py-3 border-bottom">
-        <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-list me-2 text-primary"></i> Rincian Transaksi</h6>
-    </div>
-    
-    <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
+    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
         <table class="table table-hover align-middle mb-0 small">
-            <thead class="bg-light sticky-top" style="z-index: 1;">
-                <tr>
-                    <th class="ps-4 py-3">Tanggal</th>
-                    <th class="py-3">Kategori</th>
-                    <th class="py-3">Keterangan</th>
-                    <th class="text-end py-3">Masuk</th>
-                    <th class="text-end py-3">Keluar</th>
-                </tr>
+            <thead class="bg-light sticky-top">
+                <tr><th class="ps-4 py-3">Tanggal</th><th>Kategori</th><th>Keterangan</th><th class="text-end py-3">Masuk</th><th class="text-end pe-4 py-3">Keluar</th></tr>
             </thead>
             <tbody>
-                <?php if(empty($transaksi)): ?>
-                    <tr><td colspan="5" class="text-center py-5 text-muted">Tidak ada data transaksi.</td></tr>
-                <?php endif; 
-                foreach($transaksi as $row): 
+                <?php foreach($transaksi as $row): 
                     $masuk = ($row['arus'] == 'masuk') ? $row['jumlah'] : 0;
                     $keluar = ($row['arus'] == 'keluar') ? $row['jumlah'] : 0;
                 ?>
                 <tr>
                     <td class="ps-4 fw-bold text-secondary"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
-                    <td>
-                        <span class="badge bg-light text-dark border rounded-pill px-2">
-                            <?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?>
-                        </span>
-                    </td>
+                    <td><span class="badge bg-light text-dark border px-2"><?= strtoupper(str_replace('_', ' ', $row['kategori'])) ?></span></td>
                     <td><?= htmlspecialchars($row['keterangan']) ?></td>
-                    <td class="text-end text-success fw-bold bg-success bg-opacity-10">
-                        <?= $masuk > 0 ? formatRp($masuk) : '-' ?>
-                    </td>
-                    <td class="text-end text-danger fw-bold bg-danger bg-opacity-10">
-                        <?= $keluar > 0 ? formatRp($keluar) : '-' ?>
-                    </td>
+                    <td class="text-end text-success fw-bold"><?= $masuk > 0 ? formatRp($masuk) : '-' ?></td>
+                    <td class="text-end text-danger fw-bold pe-4"><?= $keluar > 0 ? formatRp($keluar) : '-' ?></td>
                 </tr>
-                <?php endforeach; ?>
+                <?php endforeach; if(empty($transaksi)): ?>
+                    <tr><td colspan="5" class="text-center py-5 text-muted">Tidak ada data transaksi.</td></tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
