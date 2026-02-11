@@ -7,7 +7,7 @@
 if($_SESSION['user']['role'] == 'staff') {
     // 1. Hitung Transaksi Hari Ini
     $today = date('Y-m-d');
-    $trx = $pdo->query("SELECT COUNT(*) FROM transaksi_kas WHERE tanggal LIKE '$today%'")->fetchColumn();
+    $trx = $pdo->query("SELECT COUNT(*) FROM transaksi_kas WHERE tanggal = '$today'")->fetchColumn();
     
     // 2. Hitung Stok Menipis (Warning)
     $stok_koperasi = 0;
@@ -25,7 +25,8 @@ if($_SESSION['user']['role'] == 'staff') {
     // 3. Hitung Titipan Belum Bayar (Pending)
     $titipan = 0;
     try {
-        $titipan = $pdo->query("SELECT COUNT(*) FROM titipan WHERE status != 'lunas'")->fetchColumn();
+        // PERBAIKAN: Menggunakan kolom 'status_bayar'
+        $titipan = $pdo->query("SELECT COUNT(*) FROM titipan WHERE status_bayar = 'belum'")->fetchColumn();
     } catch(Exception $e){}
 ?>
     <div class="row mb-4">
@@ -92,19 +93,21 @@ if($_SESSION['user']['role'] == 'staff') {
 } else {
 
     // --- 1. HITUNG SALDO KAS FISIK (Total Uang di Tangan) ---
-    // Menghitung seluruh uang masuk dikurangi uang keluar dari semua kategori
     $q_kas = $pdo->query("SELECT SUM(CASE WHEN arus = 'masuk' THEN jumlah ELSE -jumlah END) as saldo FROM transaksi_kas")->fetch();
     $kas_fisik = $q_kas['saldo'] ?? 0;
 
     // --- 2. HITUNG KEWAJIBAN / DANA MENGENDAP (Uang Orang Lain) ---
-    // a. Tabungan Siswa/Guru (Saldo Simpanan)
-    $q_simp = $pdo->query("SELECT SUM(saldo) as saldo FROM simpanan")->fetch();
-    $total_tabungan = $q_simp['saldo'] ?? 0;
+    
+    // a. Tabungan Siswa/Guru (PERBAIKAN QUERY: Hitung Setor - Tarik)
+    // Karena tabel simpanan adalah tabel transaksi, bukan tabel saldo.
+    $q_simp = $pdo->query("SELECT SUM(CASE WHEN tipe_transaksi = 'setor' THEN jumlah ELSE -jumlah END) as total FROM simpanan")->fetch();
+    $total_tabungan = $q_simp['total'] ?? 0;
 
     // b. Hutang Titipan (Barang laku tapi uang belum disetor ke guru)
     $hutang_titipan = 0;
     try {
-        $q_titip = $pdo->query("SELECT SUM(stok_terjual * harga_beli) as hutang FROM titipan WHERE status != 'lunas'")->fetch();
+        // PERBAIKAN QUERY: Gunakan 'harga_modal' dan 'status_bayar'
+        $q_titip = $pdo->query("SELECT SUM(stok_terjual * harga_modal) as hutang FROM titipan WHERE status_bayar = 'belum'")->fetch();
         $hutang_titipan = $q_titip['hutang'] ?? 0;
     } catch(Exception $e){}
 
@@ -129,7 +132,8 @@ if($_SESSION['user']['role'] == 'staff') {
 
     // Cek Titipan
     try {
-        $sql = "SELECT id, nama_barang as nama, 'Titipan' as jenis, (stok_awal - stok_terjual) as sisa FROM titipan WHERE (stok_awal - stok_terjual) <= $limit_stok AND status != 'lunas'";
+        // PERBAIKAN QUERY: Gunakan 'status_bayar'
+        $sql = "SELECT id, nama_barang as nama, 'Titipan' as jenis, (stok_awal - stok_terjual) as sisa FROM titipan WHERE (stok_awal - stok_terjual) <= $limit_stok AND status_bayar = 'belum'";
         $stok_menipis_list = array_merge($stok_menipis_list, $pdo->query($sql)->fetchAll());
     } catch (Exception $e) {}
 
@@ -198,7 +202,7 @@ if($_SESSION['user']['role'] == 'staff') {
         <div class="card h-100 border-0 shadow-sm rounded-4">
             <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                 <h6 class="fw-bold text-dark m-0"><i class="fas fa-exchange-alt me-2 text-primary"></i> Mutasi Kas Terakhir</h6>
-                <a href="kas/laporan_kas" class="btn btn-sm btn-outline-primary rounded-pill px-3">Lihat Semua</a>
+                <a href="index.php?page=kas/laporan_kas" class="btn btn-sm btn-outline-primary rounded-pill px-3">Lihat Semua</a>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -295,7 +299,7 @@ if($_SESSION['user']['role'] == 'staff') {
             </div>
             <div class="card-footer bg-white text-center p-3">
                 <div class="d-grid gap-2">
-                    <a href="inventory/stok_koperasi" class="btn btn-outline-dark btn-sm rounded-pill fw-bold">Cek Gudang</a>
+                    <a href="index.php?page=inventory/stok_koperasi" class="btn btn-outline-dark btn-sm rounded-pill fw-bold">Cek Gudang</a>
                 </div>
             </div>
         </div>
