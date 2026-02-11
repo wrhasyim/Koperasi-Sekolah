@@ -40,12 +40,15 @@ $stok_eskul   = $pdo->query("SELECT id, nama_barang, harga_jual FROM stok_eskul 
                             <input type="file" name="file_csv" class="form-control" accept=".csv" required>
                         </div>
                         <div class="col-12 text-end">
-                             <a href="assets/template_siswa_mpls.csv" class="btn btn-outline-secondary rounded-pill me-2" download>Download Template</a>
+                            <a href="index.php?action=download_template&type=mpls" class="btn btn-outline-secondary rounded-pill me-2">
+                                <i class="fas fa-download me-1"></i> Download Template
+                            </a>
                             <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold">Upload</button>
                         </div>
                     </div>
                 </form>
             </div>
+
             <div class="tab-pane fade" id="pills-eskul">
                 <form action="process/import_handler.php" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="tipe_import" value="eskul">
@@ -64,7 +67,9 @@ $stok_eskul   = $pdo->query("SELECT id, nama_barang, harga_jual FROM stok_eskul 
                             <input type="file" name="file_csv" class="form-control" accept=".csv" required>
                         </div>
                         <div class="col-12 text-end">
-                             <a href="assets/template_anggota_eskul.csv" class="btn btn-outline-secondary rounded-pill me-2" download>Download Template</a>
+                            <a href="index.php?action=download_template&type=eskul" class="btn btn-outline-secondary rounded-pill me-2">
+                                <i class="fas fa-download me-1"></i> Download Template
+                            </a>
                             <button type="submit" class="btn btn-success rounded-pill px-5 fw-bold">Upload</button>
                         </div>
                     </div>

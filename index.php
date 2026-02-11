@@ -3,10 +3,26 @@ session_start();
 require_once 'config/database.php';
 require_once 'config/functions.php';
 
-// [PERBAIKAN] HANDLER LOGOUT (Harus diletakkan sebelum output HTML)
+// [1] HANDLER LOGOUT
 if (isset($_GET['page']) && $_GET['page'] == 'logout') {
     include 'process/auth_logout.php';
-    exit; // Hentikan script agar tidak lanjut render HTML
+    exit; 
+}
+
+// [2] HANDLER DOWNLOAD TEMPLATE DINAMIS (Solusi agar tidak terdownload .htm)
+if (isset($_GET['action']) && $_GET['action'] == 'download_template') {
+    $type = $_GET['type'] ?? '';
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Cache-Control: no-store, no-cache');
+    
+    if ($type == 'mpls') {
+        header('Content-Disposition: attachment; filename="template_siswa_mpls.csv"');
+        echo "nis,nama,kelas"; // Struktur kolom CSV untuk MPLS
+    } else {
+        header('Content-Disposition: attachment; filename="template_anggota_eskul.csv"');
+        echo "nama,kelas"; // Struktur kolom CSV untuk Eskul
+    }
+    exit;
 }
 
 cekLogin();
@@ -20,7 +36,7 @@ if(isset($_GET['page'])){
     $page = ($role == 'guru') ? 'guru/dashboard_guru' : 'dashboard';
 }
 
-// --- 1. LOGIKA BASE URL DINAMIS ---
+// --- LOGIKA BASE URL DINAMIS ---
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
 $path = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
@@ -47,8 +63,6 @@ $base_url = "$protocol://$host$path/";
             --dark: #2c3e50; --light: #f8f9fc;
         }
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; color: #5a5c69; overflow-x: hidden; }
-        
-        /* SIDEBAR MODERN */
         .sidebar { min-height: 100vh; background: #ffffff; width: 260px; position: fixed; top: 0; left: 0; z-index: 100; border-right: 1px solid #e3e6f0; transition: 0.3s; }
         .sidebar .brand { height: 70px; display: flex; align-items: center; padding: 0 25px; font-weight: 800; font-size: 1.2rem; color: var(--primary); letter-spacing: 1px; border-bottom: 1px solid #f0f0f0; }
         .sidebar-menu { padding: 20px 0; height: calc(100vh - 70px); overflow-y: auto; }
@@ -56,24 +70,10 @@ $base_url = "$protocol://$host$path/";
         .nav-link { display: flex; align-items: center; padding: 12px 25px; color: #5a5c69; font-weight: 500; font-size: 0.9rem; transition: 0.2s; position: relative; }
         .nav-link i { width: 24px; font-size: 1rem; margin-right: 10px; color: #d1d3e2; transition: 0.2s; }
         .nav-link:hover { color: var(--primary); background: #f8f9fc; text-decoration: none; }
-        .nav-link:hover i { color: var(--primary); }
         .nav-link.active { color: var(--primary); background: #f0f4ff; font-weight: 700; }
         .nav-link.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); border-radius: 0 4px 4px 0; }
-        .nav-link.active i { color: var(--primary); }
-
-        /* CONTENT AREA */
         .main-content { margin-left: 260px; padding: 30px; transition: 0.3s; }
-        
-        /* CARD PREMIUM */
-        .card { border: none; border-radius: 12px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); background: #fff; transition: box-shadow 0.2s; }
-        .card:hover { box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.15); }
-        .card-header { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 1.2rem 1.5rem; font-weight: 700; color: var(--primary); }
-        
-        /* UTILITIES */
-        .avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; text-transform: uppercase; font-size: 14px; }
-        .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
-        .table thead th { background: #f8f9fc; color: #858796; font-weight: 700; text-transform: uppercase; font-size: 0.75rem; border-bottom: 0; padding: 1rem; }
-        .table td { padding: 1rem; vertical-align: middle; color: #5a5c69; border-bottom: 1px solid #e3e6f0; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); background: #fff; }
         
         @media (max-width: 768px) {
             .sidebar { left: -260px; }
@@ -135,15 +135,12 @@ $base_url = "$protocol://$host$path/";
             <a href="kas/penjualan_inventory" class="nav-link <?= $page=='kas/penjualan_inventory'?'active':'' ?>">
                 <i class="fas fa-fw fa-tshirt"></i> <span>Kasir Seragam & Eskul</span>
             </a>
-            
             <a href="kas/manajemen_cicilan" class="nav-link <?= $page=='kas/manajemen_cicilan'?'active':'' ?>">
                 <i class="fas fa-fw fa-hand-holding-usd"></i> <span>Manajemen Cicilan</span>
             </a>
-
             <a href="pinjaman/index" class="nav-link <?= $page=='pinjaman/index'?'active':'' ?>">
                 <i class="fas fa-fw fa-money-check-alt"></i> <span>Pinjaman Dana (Tunai)</span>
             </a>
-
             <a href="simpanan/transaksi_simpanan" class="nav-link <?= $page=='simpanan/transaksi_simpanan'?'active':'' ?>">
                 <i class="fas fa-fw fa-wallet"></i> <span>Simpanan Anggota</span>
             </a>
@@ -154,23 +151,18 @@ $base_url = "$protocol://$host$path/";
             <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' ?'active':'' ?>">
                 <i class="fas fa-fw fa-book"></i> <span>Laporan Kas Koperasi</span>
             </a>
-            
             <a href="kas/rekap_honor" class="nav-link <?= $page=='kas/rekap_honor' ?'active':'' ?>">
                 <i class="fas fa-fw fa-file-invoice-dollar"></i> <span>Rekap Honor & Dansos</span>
             </a>
-
             <a href="kas/laporan_distribusi" class="nav-link <?= $page=='kas/laporan_distribusi'?'active':'' ?>">
                 <i class="fas fa-fw fa-file-contract"></i> <span>Laporan Distribusi</span>
             </a>
-
             <a href="laporan_rapat" class="nav-link <?= $page=='laporan_rapat'?'active':'' ?>">
                 <i class="fas fa-fw fa-briefcase"></i> <span>Laporan Rapat</span>
             </a>
-
             <a href="simpanan/laporan_simpanan" class="nav-link <?= $page=='simpanan/laporan_simpanan'?'active':'' ?>">
                 <i class="fas fa-fw fa-file-invoice"></i> <span>Laporan Simpanan</span>
             </a>
-
             <a href="kas/grafik_penjualan" class="nav-link <?= $page=='kas/grafik_penjualan' ?'active':'' ?>">
                 <i class="fas fa-fw fa-chart-line"></i> <span>Grafik Keuangan</span>
             </a>
@@ -184,11 +176,9 @@ $base_url = "$protocol://$host$path/";
             <a href="titipan/laporan_titipan" class="nav-link <?= $page=='titipan/laporan_titipan'?'active':'' ?>">
                 <i class="fas fa-fw fa-clipboard-list"></i> <span>Laporan Titipan</span>
             </a>
-            
             <a href="inventory/stok_sekolah" class="nav-link <?= $page=='inventory/stok_sekolah'?'active':'' ?>">
                 <i class="fas fa-fw fa-tshirt"></i> <span>Stok Seragam</span>
             </a>
-            
             <a href="inventory/stok_eskul" class="nav-link <?= $page=='inventory/stok_eskul'?'active':'' ?>">
                 <i class="fas fa-fw fa-user-astronaut"></i> <span>Stok Eskul</span>
             </a>
@@ -213,11 +203,9 @@ $base_url = "$protocol://$host$path/";
             <a href="utilitas/pengaturan" class="nav-link <?= $page=='utilitas/pengaturan'?'active':'' ?>">
                 <i class="fas fa-fw fa-cog"></i> <span>Pengaturan Sistem</span>
             </a>
-            
             <a href="utilitas/import_data" class="nav-link <?= $page=='utilitas/import_data'?'active':'' ?>">
                 <i class="fas fa-fw fa-file-upload"></i> <span>Import Data Masal</span>
             </a>
-
             <a href="utilitas/backup" class="nav-link <?= $page=='utilitas/backup'?'active':'' ?>">
                 <i class="fas fa-fw fa-database"></i> <span>Backup Data</span>
             </a>
@@ -250,74 +238,32 @@ $base_url = "$protocol://$host$path/";
 
     <div class="container-fluid p-0">
         <?php
-            // PANGGIL FLASH MESSAGE
             displayFlash();
 
-            // --- 2. SECURITY & ROUTING (WHITELIST LENGKAP) ---
             $allowed_pages = [
-                'dashboard', 
-                'data_anggota', 
-                'profil',
-                // Modul Kas
-                'kas/penjualan_inventory',
-                'kas/manajemen_cicilan',
-                'kas/kas_penjualan',
-                'kas/kas_qris',
-                'kas/kas_belanja',
-                'kas/laporan_kas',
-                'kas/rekap_honor',
-                'kas/laporan_distribusi',
-                'kas/grafik_penjualan', 
-                'laporan_rapat',
-                
-                // Modul Baru (Pinjaman & Kasbon)
-                'pinjaman/index',
-                'kasbon/index',
-
-                // Modul Simpanan
-                'simpanan/transaksi_simpanan',
-                'simpanan/laporan_simpanan',
-                
-                // Modul Inventory & Titipan
-                'titipan/titipan',
-                'titipan/laporan_titipan',
-                'inventory/stok_koperasi',
-                'inventory/stok_sekolah',
-                'inventory/stok_eskul',
-                
-                // Modul Guru
-                'guru/dashboard_guru',
-                'guru/laporan_saya',
-                'guru/pinjaman_saya',
-
-                // Modul Utilitas
-                'utilitas/pengaturan',
-                'utilitas/import_data',
-                'utilitas/backup',
-                'utilitas/riwayat_tutup_buku',
-                'utilitas/log_aktivitas', // Menu Baru
-                
-                // Logout
-                'logout'
+                'dashboard', 'data_anggota', 'profil',
+                'kas/penjualan_inventory', 'kas/manajemen_cicilan', 'kas/kas_penjualan',
+                'kas/kas_qris', 'kas/kas_belanja', 'kas/laporan_kas',
+                'kas/rekap_honor', 'kas/laporan_distribusi', 'kas/grafik_penjualan', 
+                'laporan_rapat', 'pinjaman/index', 'kasbon/index',
+                'simpanan/transaksi_simpanan', 'simpanan/laporan_simpanan',
+                'titipan/titipan', 'titipan/laporan_titipan',
+                'inventory/stok_koperasi', 'inventory/stok_sekolah', 'inventory/stok_eskul',
+                'guru/dashboard_guru', 'guru/laporan_saya', 'guru/pinjaman_saya',
+                'utilitas/pengaturan', 'utilitas/import_data', 'utilitas/backup',
+                'utilitas/riwayat_tutup_buku', 'utilitas/log_aktivitas', 'logout'
             ];
 
-            // Cek apakah halaman diminta ada di whitelist
             if(in_array($page, $allowed_pages)){
-                // Handle Logout Khusus (Sudah di-handle di atas, tapi disimpan untuk jaga-jaga)
-                if($page == 'logout'){
-                    // Harusnya tidak sampai sini karena sudah exit di atas
-                    exit;
-                }
-
+                if($page == 'logout'){ exit; }
                 $filename = "pages/" . $page . ".php";
                 if(file_exists($filename)){
                     include $filename;
                 } else {
-                    echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-muted mb-3'><i class='fas fa-exclamation-triangle'></i></div><h3 class='text-muted'>File Tidak Ditemukan</h3><p class='text-muted'>File <b>pages/$page.php</b> belum dibuat.</p></div></div>";
+                    echo "<div class='card border-0 shadow-sm p-5 text-center'><h3 class='text-muted'>File Tidak Ditemukan</h3></div>";
                 }
-
             } else {
-                echo "<div class='card border-0 shadow-sm p-5 text-center'><div class='card-body'><div class='display-1 text-danger mb-3'><i class='fas fa-ban'></i></div><h3 class='text-danger'>Akses Ditolak</h3><p class='text-muted'>Halaman tidak ditemukan atau Anda tidak memiliki akses.</p><a href='dashboard' class='btn btn-primary mt-3'>Kembali ke Dashboard</a></div></div>";
+                echo "<div class='card border-0 shadow-sm p-5 text-center'><h3 class='text-danger'>Akses Ditolak</h3><a href='dashboard' class='btn btn-primary mt-3'>Kembali</a></div>";
             }
         ?>
     </div>
