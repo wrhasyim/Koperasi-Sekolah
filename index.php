@@ -6,7 +6,13 @@ require_once 'config/functions.php';
 cekLogin();
 $user = $_SESSION['user'];
 $role = $user['role'];
-$page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
+
+// Default landing page logic
+if(isset($_GET['page'])){
+    $page = $_GET['page'];
+} else {
+    $page = ($role == 'guru') ? 'guru/dashboard_guru' : 'dashboard';
+}
 
 // --- 1. LOGIKA BASE URL DINAMIS ---
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
@@ -53,25 +59,10 @@ $base_url = "$protocol://$host$path/";
         .main-content { margin-left: 260px; padding: 30px; transition: 0.3s; }
         
         /* CARD PREMIUM */
-        .card { 
-            border: none; 
-            border-radius: 12px; 
-            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); 
-            background: #fff; 
-            transition: box-shadow 0.2s; 
-        }
-        .card:hover { 
-            box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.15); 
-        }
+        .card { border: none; border-radius: 12px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05); background: #fff; transition: box-shadow 0.2s; }
+        .card:hover { box-shadow: 0 0.5rem 2rem 0 rgba(58, 59, 69, 0.15); }
         .card-header { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 1.2rem 1.5rem; font-weight: 700; color: var(--primary); }
         
-        /* GRADIENTS */
-        .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
-        .bg-gradient-success { background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%); }
-        .bg-gradient-info    { background: linear-gradient(135deg, #36b9cc 0%, #258391 100%); }
-        .bg-gradient-warning { background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%); }
-        .bg-gradient-danger  { background: linear-gradient(135deg, #e74a3b 0%, #be2617 100%); }
-
         /* UTILITIES */
         .avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; text-transform: uppercase; font-size: 14px; }
         .btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
@@ -96,53 +87,70 @@ $base_url = "$protocol://$host$path/";
         <i class="fas fa-shapes me-2"></i> KOPERASI
     </div>
     <div class="sidebar-menu">
-        <a href="dashboard" class="nav-link <?= $page=='dashboard'?'active':'' ?>">
-            <i class="fas fa-fw fa-tachometer-alt"></i> <span>Dashboard</span>
-        </a>
+        
+        <?php if($role == 'guru'): ?>
+            <a href="guru/dashboard_guru" class="nav-link <?= $page=='guru/dashboard_guru'?'active':'' ?>">
+                <i class="fas fa-fw fa-home"></i> <span>Dashboard Saya</span>
+            </a>
+        <?php else: ?>
+            <a href="dashboard" class="nav-link <?= $page=='dashboard'?'active':'' ?>">
+                <i class="fas fa-fw fa-tachometer-alt"></i> <span>Dashboard</span>
+            </a>
+        <?php endif; ?>
 
-        <?php if($role == 'admin' || $role == 'staff' || $role == 'pengurus'): ?>
+        <?php if($role == 'admin' || $role == 'pengurus'): ?>
         <div class="nav-header">Master Data</div>
         <a href="data_anggota" class="nav-link <?= $page=='data_anggota'?'active':'' ?>">
             <i class="fas fa-fw fa-users"></i> <span>Data Anggota</span>
         </a>
         <?php endif; ?>
 
-        <?php if($role != 'guru'): ?> 
-        <div class="nav-header">Transaksi & Keuangan</div>
-            <?php if($role == 'admin' || $role == 'staff'): ?>
-            <a href="simpanan/transaksi_simpanan" class="nav-link <?= $page=='simpanan/transaksi_simpanan'?'active':'' ?>">
-                <i class="fas fa-fw fa-wallet"></i> <span>Transaksi Simpanan</span>
-            </a>
-            
-            <a href="kas/penjualan_inventory" class="nav-link <?= $page=='kas/penjualan_inventory'?'active':'' ?>">
-                <i class="fas fa-fw fa-tags"></i> <span>Kasir Seragam & Eskul</span>
-            </a>
-            
-            <a href="kas/manajemen_cicilan" class="nav-link <?= $page=='kas/manajemen_cicilan'?'active':'' ?>">
-                <i class="fas fa-fw fa-hand-holding-usd"></i> <span>Manajemen Cicilan</span>
-            </a>
-
+        <?php if($role == 'admin' || $role == 'staff'): ?> 
+        <div class="nav-header">Operasional Harian</div>
             <a href="kas/kas_penjualan" class="nav-link <?= $page=='kas/kas_penjualan'?'active':'' ?>">
                 <i class="fas fa-fw fa-cash-register"></i> <span>Kasir Omzet Manual</span>
             </a>
             <a href="kas/kas_qris" class="nav-link <?= $page=='kas/kas_qris'?'active':'' ?>">
                 <i class="fas fa-fw fa-qrcode"></i> <span>Transaksi QRIS</span>
             </a>
+            <a href="inventory/stok_koperasi" class="nav-link <?= $page=='inventory/stok_koperasi'?'active':'' ?>">
+                <i class="fas fa-fw fa-store"></i> <span>Stok Koperasi (Jajan)</span>
+            </a>
             <a href="kas/kas_belanja" class="nav-link <?= $page=='kas/kas_belanja'?'active':'' ?>">
                 <i class="fas fa-fw fa-shopping-cart"></i> <span>Belanja Stok</span>
             </a>
-            <?php endif; ?>
+            <a href="kasbon/index" class="nav-link <?= $page=='kasbon/index'?'active':'' ?>">
+                <i class="fas fa-fw fa-receipt"></i> <span>Kasbon Jajan (Barang)</span>
+            </a>
+        <?php endif; ?>
+
+        <?php if($role == 'admin' || $role == 'pengurus'): ?>
+        <div class="nav-header">Keuangan & Kredit</div>
+            <a href="kas/penjualan_inventory" class="nav-link <?= $page=='kas/penjualan_inventory'?'active':'' ?>">
+                <i class="fas fa-fw fa-tshirt"></i> <span>Kasir Seragam & Eskul</span>
+            </a>
             
-            <a href="kas/grafik_penjualan" class="nav-link <?= $page=='kas/grafik_penjualan' ?'active':'' ?>">
-                <i class="fas fa-fw fa-chart-line"></i> <span>Grafik Keuangan</span>
+            <a href="kas/manajemen_cicilan" class="nav-link <?= $page=='kas/manajemen_cicilan'?'active':'' ?>">
+                <i class="fas fa-fw fa-hand-holding-usd"></i> <span>Manajemen Cicilan</span>
             </a>
 
+            <a href="pinjaman/index" class="nav-link <?= $page=='pinjaman/index'?'active':'' ?>">
+                <i class="fas fa-fw fa-money-check-alt"></i> <span>Pinjaman Dana (Tunai)</span>
+            </a>
+
+            <a href="simpanan/transaksi_simpanan" class="nav-link <?= $page=='simpanan/transaksi_simpanan'?'active':'' ?>">
+                <i class="fas fa-fw fa-wallet"></i> <span>Simpanan Anggota</span>
+            </a>
+        <?php endif; ?>
+
+        <?php if($role == 'admin' || $role == 'pengurus'): ?>
+        <div class="nav-header">Laporan & Honor</div>
             <a href="kas/laporan_kas" class="nav-link <?= $page=='kas/laporan_kas' ?'active':'' ?>">
                 <i class="fas fa-fw fa-book"></i> <span>Laporan Kas Koperasi</span>
             </a>
             
             <a href="kas/rekap_honor" class="nav-link <?= $page=='kas/rekap_honor' ?'active':'' ?>">
-                <i class="fas fa-fw fa-hand-holding-usd"></i> <span>Rekap Honor & Dansos</span>
+                <i class="fas fa-fw fa-file-invoice-dollar"></i> <span>Rekap Honor & Dansos</span>
             </a>
 
             <a href="kas/laporan_distribusi" class="nav-link <?= $page=='kas/laporan_distribusi'?'active':'' ?>">
@@ -156,6 +164,10 @@ $base_url = "$protocol://$host$path/";
             <a href="simpanan/laporan_simpanan" class="nav-link <?= $page=='simpanan/laporan_simpanan'?'active':'' ?>">
                 <i class="fas fa-fw fa-file-invoice"></i> <span>Laporan Simpanan</span>
             </a>
+
+            <a href="kas/grafik_penjualan" class="nav-link <?= $page=='kas/grafik_penjualan' ?'active':'' ?>">
+                <i class="fas fa-fw fa-chart-line"></i> <span>Grafik Keuangan</span>
+            </a>
         <?php endif; ?>
 
         <?php if($role != 'guru'): ?>
@@ -167,16 +179,22 @@ $base_url = "$protocol://$host$path/";
                 <i class="fas fa-fw fa-clipboard-list"></i> <span>Laporan Titipan</span>
             </a>
             
-            <a href="inventory/stok_koperasi" class="nav-link <?= $page=='inventory/stok_koperasi'?'active':'' ?>">
-                <i class="fas fa-fw fa-store"></i> <span>Stok Koperasi</span>
-            </a>
-
             <a href="inventory/stok_sekolah" class="nav-link <?= $page=='inventory/stok_sekolah'?'active':'' ?>">
                 <i class="fas fa-fw fa-tshirt"></i> <span>Stok Seragam</span>
             </a>
             
             <a href="inventory/stok_eskul" class="nav-link <?= $page=='inventory/stok_eskul'?'active':'' ?>">
                 <i class="fas fa-fw fa-user-astronaut"></i> <span>Stok Eskul</span>
+            </a>
+        <?php endif; ?>
+
+        <?php if($role == 'guru'): ?>
+        <div class="nav-header">Area Guru</div>
+            <a href="guru/laporan_saya" class="nav-link <?= $page=='guru/laporan_saya'?'active':'' ?>">
+                <i class="fas fa-fw fa-box"></i> <span>Barang Titipan Saya</span>
+            </a>
+            <a href="guru/pinjaman_saya" class="nav-link <?= $page=='guru/pinjaman_saya'?'active':'' ?>">
+                <i class="fas fa-fw fa-money-bill"></i> <span>Pinjaman & Kasbon</span>
             </a>
         <?php endif; ?>
 
@@ -188,6 +206,10 @@ $base_url = "$protocol://$host$path/";
         <?php if($role == 'admin'): ?>
             <a href="utilitas/pengaturan" class="nav-link <?= $page=='utilitas/pengaturan'?'active':'' ?>">
                 <i class="fas fa-fw fa-cog"></i> <span>Pengaturan Sistem</span>
+            </a>
+            
+            <a href="utilitas/import_data" class="nav-link <?= $page=='utilitas/import_data'?'active':'' ?>">
+                <i class="fas fa-fw fa-file-upload"></i> <span>Import Data Masal</span>
             </a>
 
             <a href="utilitas/backup" class="nav-link <?= $page=='utilitas/backup'?'active':'' ?>">
@@ -219,10 +241,10 @@ $base_url = "$protocol://$host$path/";
 
     <div class="container-fluid p-0">
         <?php
-            // [BARU] PANGGIL FLASH MESSAGE DISINI
+            // PANGGIL FLASH MESSAGE
             displayFlash();
 
-            // --- 2. SECURITY & ROUTING (WHITELIST) ---
+            // --- 2. SECURITY & ROUTING (WHITELIST LENGKAP) ---
             $allowed_pages = [
                 'dashboard', 
                 'data_anggota', 
@@ -234,24 +256,37 @@ $base_url = "$protocol://$host$path/";
                 'kas/kas_qris',
                 'kas/kas_belanja',
                 'kas/laporan_kas',
-                'kas/rekap_honor', // [BARU] Routing Rekap Honor
+                'kas/rekap_honor',
                 'kas/laporan_distribusi',
                 'kas/grafik_penjualan', 
                 'laporan_rapat',
                 
+                // Modul Baru (Pinjaman & Kasbon)
+                'pinjaman/index',
+                'kasbon/index',
+
                 // Modul Simpanan
                 'simpanan/transaksi_simpanan',
                 'simpanan/laporan_simpanan',
+                
                 // Modul Inventory & Titipan
                 'titipan/titipan',
                 'titipan/laporan_titipan',
                 'inventory/stok_koperasi',
                 'inventory/stok_sekolah',
                 'inventory/stok_eskul',
+                
+                // Modul Guru
+                'guru/dashboard_guru',
+                'guru/laporan_saya',
+                'guru/pinjaman_saya',
+
                 // Modul Utilitas
-                'utilitas/pengaturan', // [BARU] Routing Pengaturan
+                'utilitas/pengaturan',
+                'utilitas/import_data',
                 'utilitas/backup',
                 'utilitas/riwayat_tutup_buku',
+                
                 // Logout
                 'logout'
             ];

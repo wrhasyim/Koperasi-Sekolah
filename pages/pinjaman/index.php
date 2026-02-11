@@ -3,9 +3,12 @@
 require_once 'config/database.php';
 
 // AMBIL SETTING BUNGA
-$bunga_persen = getPengaturan($pdo, 'bunga_pinjaman');
+$bunga_persen = 0;
+if(function_exists('getPengaturan')){
+    $bunga_persen = getPengaturan($pdo, 'bunga_pinjaman');
+}
 
-// --- PROSES 1: TAMBAH PINJAMAN BARU ---
+// --- PROSES 1: TAMBAH PINJAMAN TUNAI ---
 if(isset($_POST['tambah_pinjaman'])){
     try {
         $anggota_id = $_POST['anggota_id'];
@@ -13,19 +16,17 @@ if(isset($_POST['tambah_pinjaman'])){
         $tanggal    = $_POST['tanggal'];
         $ket        = $_POST['keterangan'];
 
-        // Hitung Bunga
         $nominal_bunga = $jumlah * ($bunga_persen / 100);
         $total_tagihan = $jumlah + $nominal_bunga;
 
         $pdo->beginTransaction();
 
-        // 1. Insert ke Tabel Pinjaman
         $sql = "INSERT INTO pinjaman_dana (anggota_id, tanggal_pinjam, jumlah_pinjam, bunga_persen, nominal_bunga, total_tagihan, sisa_tagihan, keterangan, status) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'belum')";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$anggota_id, $tanggal, $jumlah, $bunga_persen, $nominal_bunga, $total_tagihan, $total_tagihan, $ket]);
 
-        // 2. Catat Uang Keluar di KAS (Hanya Pokok)
+        // Catat Uang Keluar (Pokok)
         $sql_kas = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, 'pinjaman_anggota', 'keluar', ?, ?, ?)";
         $stmt_kas = $pdo->prepare($sql_kas);
         $ket_kas = "Pencairan Pinjaman: " . getNamaAnggota($pdo, $anggota_id);
@@ -46,7 +47,6 @@ if(isset($_POST['bayar_cicilan'])){
         $bayar       = $_POST['jumlah_bayar'];
         $tanggal     = date('Y-m-d');
 
-        // Cek Sisa
         $stmt = $pdo->prepare("SELECT * FROM pinjaman_dana WHERE id = ?");
         $stmt->execute([$pinjaman_id]);
         $data = $stmt->fetch();
@@ -60,15 +60,12 @@ if(isset($_POST['bayar_cicilan'])){
 
         $pdo->beginTransaction();
 
-        // 1. Update Pinjaman
         $sql_upd = "UPDATE pinjaman_dana SET sisa_tagihan = ?, status = ? WHERE id = ?";
         $pdo->prepare($sql_upd)->execute([$sisa_baru, $status_baru, $pinjaman_id]);
 
-        // 2. Catat Riwayat
         $sql_riw = "INSERT INTO riwayat_bayar_pinjaman (pinjaman_id, tanggal_bayar, jumlah_bayar, sisa_akhir, user_id) VALUES (?, ?, ?, ?, ?)";
         $pdo->prepare($sql_riw)->execute([$pinjaman_id, $tanggal, $bayar, $sisa_baru, $_SESSION['user']['id']]);
 
-        // 3. Catat Pemasukan Kas (Cicilan Masuk)
         $sql_kas = "INSERT INTO transaksi_kas (tanggal, kategori, arus, jumlah, keterangan, user_id) VALUES (?, 'bayar_pinjaman', 'masuk', ?, ?, ?)";
         $ket_kas = "Cicilan Pinjaman: " . getNamaAnggota($pdo, $data['anggota_id']);
         $pdo->prepare($sql_kas)->execute([$tanggal, $bayar, $ket_kas, $_SESSION['user']['id']]);
@@ -122,7 +119,7 @@ $list_pinjaman = $pdo->query($sql_list)->fetchAll();
                     <?php foreach($list_pinjaman as $row): ?>
                     <tr>
                         <td class="ps-4"><?= date('d/m/y', strtotime($row['tanggal_pinjam'])) ?></td>
-                        <td class="fw-bold"><?= $row['nama_lengkap'] ?></td>
+                        <td class="fw-bold"><?= htmlspecialchars($row['nama_lengkap']) ?></td>
                         <td class="text-end"><?= number_format($row['jumlah_pinjam']) ?></td>
                         <td class="text-end text-danger">+ <?= number_format($row['nominal_bunga']) ?></td>
                         <td class="text-end fw-bold"><?= number_format($row['total_tagihan']) ?></td>
@@ -137,7 +134,7 @@ $list_pinjaman = $pdo->query($sql_list)->fetchAll();
                         <td class="text-center">
                             <?php if($row['status']!='lunas'): ?>
                             <button class="btn btn-sm btn-outline-primary rounded-pill px-3" 
-                                    onclick="bayar('<?= $row['id'] ?>', '<?= $row['nama_lengkap'] ?>', '<?= $row['sisa_tagihan'] ?>')">
+                                    onclick="bayar('<?= $row['id'] ?>', '<?= htmlspecialchars($row['nama_lengkap']) ?>', '<?= $row['sisa_tagihan'] ?>')">
                                 Bayar
                             </button>
                             <?php else: ?>
@@ -152,12 +149,99 @@ $list_pinjaman = $pdo->query($sql_list)->fetchAll();
     </div>
 </div>
 
-<?php include 'modal_pinjaman_partial.php'; // Atau paste modal code dari chat sebelumnya disini ?> 
+<div class="modal fade" id="modalPinjam" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Ajukan Pinjaman Tunai</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Peminjam (Guru/Staff)</label>
+                        <select name="anggota_id" class="form-select" required>
+                            <option value="">-- Pilih Anggota --</option>
+                            <?php foreach($list_anggota as $a): ?>
+                                <option value="<?= $a['id'] ?>"><?= htmlspecialchars($a['nama_lengkap']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Jumlah Pinjaman Tunai (Pokok)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Rp</span>
+                            <input type="number" name="jumlah" class="form-control" required min="1000" id="inputPokok">
+                        </div>
+                        <small class="text-danger mt-1 d-block" id="infoBunga">
+                            * Akan dikenakan bunga <?= $bunga_persen ?>%
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Tanggal Pencairan</label>
+                        <input type="date" name="tanggal" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Keterangan / Keperluan</label>
+                        <textarea name="keterangan" class="form-control" rows="2" placeholder="Contoh: Keperluan mendesak..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="submit" name="tambah_pinjaman" class="btn btn-primary w-100 rounded-pill fw-bold">Cairkan Dana</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalBayar" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header border-0 bg-primary text-white">
+                <h6 class="modal-title fw-bold">Bayar Cicilan</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="pinjaman_id" id="bayar_id">
+                    <div class="mb-3 text-center">
+                        <p class="mb-1 small text-muted">Peminjam</p>
+                        <h6 class="fw-bold" id="bayar_nama"></h6>
+                    </div>
+                    <div class="mb-3 text-center">
+                        <p class="mb-1 small text-muted">Sisa Hutang</p>
+                        <h4 class="fw-bold text-danger" id="bayar_sisa_txt"></h4>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Bayar Sejumlah</label>
+                        <input type="number" name="jumlah_bayar" class="form-control text-center fw-bold" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-2">
+                    <button type="submit" name="bayar_cicilan" class="btn btn-success w-100 rounded-pill fw-bold">Simpan Pembayaran</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 function bayar(id, nama, sisa){
     document.getElementById('bayar_id').value = id;
     document.getElementById('bayar_nama').innerText = nama;
     document.getElementById('bayar_sisa_txt').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(sisa);
     new bootstrap.Modal(document.getElementById('modalBayar')).show();
+}
+
+// Live Calc Info Bunga
+const inputPokok = document.getElementById('inputPokok');
+if(inputPokok){
+    inputPokok.addEventListener('input', function(){
+        let pokok = this.value;
+        let persen = <?= $bunga_persen ?>;
+        let bunga = pokok * (persen/100);
+        let total = parseFloat(pokok) + parseFloat(bunga);
+        document.getElementById('infoBunga').innerText = `* Bunga: Rp ${bunga.toLocaleString()} | Total Kembali: Rp ${total.toLocaleString()}`;
+    });
 }
 </script>

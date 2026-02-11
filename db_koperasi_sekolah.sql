@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Feb 10, 2026 at 10:46 AM
+-- Generation Time: Feb 11, 2026 at 02:02 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -85,6 +85,39 @@ INSERT INTO `cicilan` (`id`, `nama_siswa`, `kelas`, `kategori_barang`, `nama_bar
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `hutang_jajan`
+--
+
+CREATE TABLE `hutang_jajan` (
+  `id` int(11) NOT NULL,
+  `anggota_id` int(11) NOT NULL,
+  `tanggal` date NOT NULL,
+  `total_belanja` decimal(15,2) NOT NULL,
+  `status` enum('lunas','belum') DEFAULT 'belum',
+  `keterangan` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `kasbon`
+--
+
+CREATE TABLE `kasbon` (
+  `id` int(11) NOT NULL,
+  `anggota_id` int(11) NOT NULL,
+  `tanggal_pinjam` date NOT NULL,
+  `jumlah_pinjam` decimal(15,2) NOT NULL,
+  `sisa_pinjaman` decimal(15,2) NOT NULL,
+  `keterangan` text DEFAULT NULL,
+  `status` enum('lunas','belum') DEFAULT 'belum',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `log_aktivitas`
 --
 
@@ -113,6 +146,7 @@ CREATE TABLE `pengaturan` (
 --
 
 INSERT INTO `pengaturan` (`kunci`, `nilai`, `keterangan`) VALUES
+('bunga_pinjaman', '2', 'Bunga Pinjaman Tunai (%)'),
 ('header_alamat', 'Jl. Pendidikan No. 1, Jakarta Selatan', 'Alamat di Header Cetak'),
 ('header_kontak', 'Telp: (021) 1234567 | Email: kopsis@sekolah.sch.id', 'Kontak di Header Cetak'),
 ('header_nama', 'KOPERASI TUNAS MUDA', 'Nama Instansi di Header Cetak'),
@@ -121,6 +155,58 @@ INSERT INTO `pengaturan` (`kunci`, `nilai`, `keterangan`) VALUES
 ('persen_pembina', '5', 'Persentase Honor Pembina (%)'),
 ('persen_pengurus', '15', 'Persentase Honor Pengurus (%)'),
 ('persen_staff', '5', 'Persentase Honor Staff (%)');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `pinjaman_dana`
+--
+
+CREATE TABLE `pinjaman_dana` (
+  `id` int(11) NOT NULL,
+  `anggota_id` int(11) NOT NULL,
+  `tanggal_pinjam` date NOT NULL,
+  `jumlah_pinjam` decimal(15,2) NOT NULL,
+  `bunga_persen` decimal(5,2) NOT NULL,
+  `nominal_bunga` decimal(15,2) NOT NULL,
+  `total_tagihan` decimal(15,2) NOT NULL,
+  `sisa_tagihan` decimal(15,2) NOT NULL,
+  `keterangan` text DEFAULT NULL,
+  `status` enum('lunas','belum') DEFAULT 'belum',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `riwayat_bayar_kasbon`
+--
+
+CREATE TABLE `riwayat_bayar_kasbon` (
+  `id` int(11) NOT NULL,
+  `kasbon_id` int(11) NOT NULL,
+  `tanggal_bayar` date NOT NULL,
+  `jumlah_bayar` decimal(15,2) NOT NULL,
+  `sisa_setelah_bayar` decimal(15,2) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `riwayat_bayar_pinjaman`
+--
+
+CREATE TABLE `riwayat_bayar_pinjaman` (
+  `id` int(11) NOT NULL,
+  `pinjaman_id` int(11) NOT NULL,
+  `tanggal_bayar` date NOT NULL,
+  `jumlah_bayar` decimal(15,2) NOT NULL,
+  `sisa_akhir` decimal(15,2) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -334,7 +420,8 @@ INSERT INTO `transaksi_kas` (`id`, `tanggal`, `kategori`, `arus`, `jumlah`, `ket
 (12, '2026-02-10', 'penjualan_eskul', 'masuk', 10000.00, 'Terima (CICILAN (HUTANG)): Baju Silat (Pencak Silat) - MUMUN (MPLB 10)', 1, '2026-02-10 09:06:12'),
 (13, '2026-02-10', 'qris_masuk', 'masuk', 150.00, 'p', 1, '2026-02-10 09:09:22'),
 (14, '2026-02-10', 'bagi_hasil_pengurus', 'keluar', 739147.50, 'Pembayaran Honor/Jatah Pengurus (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:32:04'),
-(15, '2026-02-10', 'bagi_hasil_staff', 'keluar', 246382.50, 'Pembayaran Honor/Jatah Staff (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:34:43');
+(15, '2026-02-10', 'bagi_hasil_staff', 'keluar', 246382.50, 'Pembayaran Honor/Jatah Staff (Periode: 2026-02-01 s/d 2026-02-10)', 1, '2026-02-10 09:34:43'),
+(16, '2026-02-11', 'bagi_hasil_pengurus', 'keluar', 739147.50, 'Pembayaran Honor/Jatah Pengurus (Periode: 2026-02-01 s/d 2026-02-11)', 1, '2026-02-11 00:59:28');
 
 -- --------------------------------------------------------
 
@@ -372,6 +459,20 @@ ALTER TABLE `cicilan`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `hutang_jajan`
+--
+ALTER TABLE `hutang_jajan`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `anggota_id` (`anggota_id`);
+
+--
+-- Indexes for table `kasbon`
+--
+ALTER TABLE `kasbon`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `anggota_id` (`anggota_id`);
+
+--
 -- Indexes for table `log_aktivitas`
 --
 ALTER TABLE `log_aktivitas`
@@ -382,6 +483,26 @@ ALTER TABLE `log_aktivitas`
 --
 ALTER TABLE `pengaturan`
   ADD PRIMARY KEY (`kunci`);
+
+--
+-- Indexes for table `pinjaman_dana`
+--
+ALTER TABLE `pinjaman_dana`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `anggota_id` (`anggota_id`);
+
+--
+-- Indexes for table `riwayat_bayar_kasbon`
+--
+ALTER TABLE `riwayat_bayar_kasbon`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `kasbon_id` (`kasbon_id`);
+
+--
+-- Indexes for table `riwayat_bayar_pinjaman`
+--
+ALTER TABLE `riwayat_bayar_pinjaman`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `riwayat_pengambilan`
@@ -457,9 +578,39 @@ ALTER TABLE `cicilan`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
+-- AUTO_INCREMENT for table `hutang_jajan`
+--
+ALTER TABLE `hutang_jajan`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `kasbon`
+--
+ALTER TABLE `kasbon`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `log_aktivitas`
 --
 ALTER TABLE `log_aktivitas`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `pinjaman_dana`
+--
+ALTER TABLE `pinjaman_dana`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `riwayat_bayar_kasbon`
+--
+ALTER TABLE `riwayat_bayar_kasbon`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `riwayat_bayar_pinjaman`
+--
+ALTER TABLE `riwayat_bayar_pinjaman`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -508,7 +659,7 @@ ALTER TABLE `titipan`
 -- AUTO_INCREMENT for table `transaksi_kas`
 --
 ALTER TABLE `transaksi_kas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `tutup_buku`
@@ -519,6 +670,30 @@ ALTER TABLE `tutup_buku`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `hutang_jajan`
+--
+ALTER TABLE `hutang_jajan`
+  ADD CONSTRAINT `fk_hutang_anggota` FOREIGN KEY (`anggota_id`) REFERENCES `anggota` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `kasbon`
+--
+ALTER TABLE `kasbon`
+  ADD CONSTRAINT `fk_kasbon_anggota` FOREIGN KEY (`anggota_id`) REFERENCES `anggota` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `pinjaman_dana`
+--
+ALTER TABLE `pinjaman_dana`
+  ADD CONSTRAINT `fk_pinjaman_anggota` FOREIGN KEY (`anggota_id`) REFERENCES `anggota` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `riwayat_bayar_kasbon`
+--
+ALTER TABLE `riwayat_bayar_kasbon`
+  ADD CONSTRAINT `fk_bayar_kasbon` FOREIGN KEY (`kasbon_id`) REFERENCES `kasbon` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `simpanan`
